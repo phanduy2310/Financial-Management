@@ -1,0 +1,29 @@
+{
+  "name": "transaction-service",
+  "version": "1.0.0",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "migrate:latest": "knex migrate:latest --knexfile src/config/database.js",
+    "migrate:rollback": "knex migrate:rollback --knexfile src/config/database.js",
+    "migrate:make": "knex migrate:make --knexfile src/config/database.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "axios": "^1.15.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.1",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "knex": "^3.2.9",
+    "morgan": "^1.10.1",
+    "mysql2": "^3.20.0",
+    "objection": "^3.1.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
