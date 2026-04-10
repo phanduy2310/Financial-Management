@@ -49,6 +49,26 @@ services:
     networks:
       - app-network
 
+  # ─── MySQL ───────────────────────────────────────
+  mysql:
+    image: mysql:8
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: financial_transaction
+      MYSQL_USER: finance_user
+      MYSQL_PASSWORD: finance_pass
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # ─── Shared Infrastructure (uncomment as needed) ─
   # db:
   #   image: postgres:16-alpine    # or mysql:8, mongo:7, etc.
@@ -84,3 +104,5 @@ networks:
 
 # volumes:
 #   db-data:
+volumes:
+  mysql-data:

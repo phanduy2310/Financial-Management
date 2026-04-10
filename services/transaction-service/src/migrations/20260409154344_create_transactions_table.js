@@ -2,23 +2,23 @@
  * @param { import("knex").Knex } knex
  * @returns { Promise<void> }
  */
-export async function up(knex) {
-  await knex.schema.createTable('transactions', (table) => {
-    table.increments('id').primary();                        // AUTO_INCREMENT PK
-    table.integer('user_id').unsigned().notNullable();       // FK tới user
-    table.decimal('amount', 15, 2).notNullable();            // số tiền
-    table.enum('type', ['income', 'expense']).notNullable(); // loại giao dịch
-    table.string('category', 100).nullable();                // danh mục giao dịch
-    table.string('description', 255).nullable();
-    table.date('transaction_date').notNullable();
-    table.timestamps(true, true);                            // created_at, updated_at
-  });
-}
+exports.up = async function (knex) {
+    await knex.schema.createTable("transactions", (t) => {
+        t.increments("id").primary();
+        t.integer("user_id").notNullable();
+        t.string("type").notNullable();       // income | expense
+        t.string("category").notNullable();   // ăn uống, học tập, v.v.
+        t.decimal("amount", 10, 2).notNullable();
+        t.date("date").notNullable();
+        t.string("note");
+        t.timestamps(true, true);
+    });
+};
 
 /**
  * @param { import("knex").Knex } knex
  * @returns { Promise<void> }
  */
-export async function down(knex) {
-  await knex.schema.dropTableIfExists('transactions');
-}
+exports.down = async function (knex) {
+    await knex.schema.dropTableIfExists("transactions");
+};

@@ -1,11 +1,8 @@
-import { Model } from 'objection';
-import Knex from 'knex';
-import { createRequire } from 'module';
-
-const require = createRequire(import.meta.url);
+const { Model } = require('objection');
+const Knex = require('knex');
 const knexConfig = require('./database.js');
 
 const knex = Knex(knexConfig);
 Model.knex(knex);
 
-export default Model;
+module.exports = Model;
