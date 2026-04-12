@@ -1,0 +1,222 @@
+openapi: 3.0.3
+info:
+  title: Notification Service API
+  description: |
+    Messaging Context — thông báo real-time qua Server-Sent Events (SSE).
+    Nhận event từ các service khác qua internal endpoint, push đến client qua SSE stream.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:5444
+    description: Qua API Gateway
+
+paths:
+  /health:
+    get:
+      summary: Health check (gateway)
+      operationId: healthCheck
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /api/notification/stream:
+    get:
+      summary: Kết nối SSE stream nhận thông báo real-time
+      operationId: sseStream
+      description: |
+        Mở Server-Sent Events stream cho user.
+        Token được truyền qua query parameter `?token=<jwt>` vì EventSource không hỗ trợ Authorization header.
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+          description: JWT access token
+      responses:
+        "200":
+          description: SSE stream — Content-Type text/event-stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                example: "data: {\"type\":\"NEW_NOTIFICATION\",\"notification\":{\"id\":1,\"event\":\"TRANSACTION_CREATED\",\"message\":\"Giao dịch mới: -50.000đ\",\"is_read\":false}}\n\n"
+        "401":
+          description: Token không hợp lệ
+
+  /api/notification:
+    get:
+      summary: Lấy danh sách thông báo của user
+      operationId: listNotifications
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            maximum: 50
+            default: 20
+      responses:
+        "200":
+          description: Danh sách thông báo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Notification"
+
+  /api/notification/unread-count:
+    get:
+      summary: Đếm số thông báo chưa đọc
+      operationId: unreadCount
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Số lượng chưa đọc
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+
+  /api/notification/{id}/read:
+    post:
+      summary: Đánh dấu thông báo đã đọc
+      operationId: markRead
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Đã đánh dấu đọc
+        "404":
+          description: Không tìm thấy thông báo
+
+  /internal/publish:
+    post:
+      summary: Publish event thông báo (internal — chỉ dùng giữa các service)
+      operationId: publishNotification
+      description: |
+        Fire-and-forget endpoint dùng bởi auth-service, transaction-service, saving-service.
+        Yêu cầu header `x-internal-key` khớp với `INTERNAL_API_KEY` trong .env.
+      parameters:
+        - name: x-internal-key
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Shared secret key giữa các service
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublishRequest"
+      responses:
+        "200":
+          description: Event đã được publish
+        "403":
+          description: Forbidden — sai internal key
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+
+    Notification:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        event:
+          type: string
+          description: Loại event
+          enum:
+            [
+              PARENT_LINK_REQUEST,
+              TRANSACTION_CREATED,
+              INSTALLMENT_DUE_SOON,
+              SAVING_PLAN_COMPLETED,
+            ]
+        title:
+          type: string
+        message:
+          type: string
+        data:
+          type: object
+          description: Payload bổ sung theo từng event
+        channels:
+          type: array
+          items:
+            type: string
+        source_service:
+          type: string
+        is_read:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    PublishRequest:
+      type: object
+      required: [event, user_id]
+      properties:
+        event:
+          type: string
+          description: Loại event
+          enum:
+            [
+              PARENT_LINK_REQUEST,
+              TRANSACTION_CREATED,
+              INSTALLMENT_DUE_SOON,
+              SAVING_PLAN_COMPLETED,
+            ]
+          example: TRANSACTION_CREATED
+        user_id:
+          type: integer
+        channels:
+          type: array
+          items:
+            type: string
+          example: ["web"]
+          description: Mặc định ["web"] nếu không truyền
+        source_service:
+          type: string
+          example: transaction-service
+        payload:
+          type: object
+          description: |
+            Payload theo từng event:
+            - PARENT_LINK_REQUEST → {parent_email, token}
+            - TRANSACTION_CREATED → {type, category, amount, date}
+            - INSTALLMENT_DUE_SOON → {message, due_date}
+            - SAVING_PLAN_COMPLETED → {title}
