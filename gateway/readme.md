@@ -1,44 +1,38 @@
-# API Gateway
+# API Gateway — PTIT-Financial
 
-## Overview
-
-The API Gateway serves as the single entry point for all client requests. It routes incoming requests to the appropriate backend microservice.
-
-## Responsibilities
-
-- **Request routing**: Forward requests to the correct service
-- **Load balancing**: Distribute traffic (if applicable)
-- **Authentication**: Validate tokens/credentials (optional)
-- **Rate limiting**: Protect services from overload (optional)
-- **CORS handling**: Allow frontend cross-origin requests
-- **Request/Response transformation**: Modify headers, paths as needed
+Cổng duy nhất cho toàn bộ hệ thống. Nhận request từ frontend, xử lý CORS và route đến đúng microservice.
 
 ## Tech Stack
 
-| Component  | Choice             |
-|------------|--------------------|
-| Approach   | *(e.g., Nginx, Express, FastAPI, Kong, Traefik)* |
+- Node.js + Express + axios (manual proxy — không dùng http-proxy-middleware)
+
+## Port
+
+- `5444` (host & container)
 
 ## Routing Table
 
-| External Path        | Target Service | Internal URL                   |
-|----------------------|----------------|--------------------------------|
-| `/api/service-a/*`   | Service A      | `http://service-a:5000/*`      |
-| `/api/service-b/*`   | Service B      | `http://service-b:5000/*`      |
+| External Path               | Target Service            |
+| --------------------------- | ------------------------- |
+| `/api/auth/*`               | auth-service:8081         |
+| `/api/parent/*`             | auth-service:8081         |
+| `/api/transactions/*`       | transaction-service:8082  |
+| `/api/budget/*`             | transaction-service:8082  |
+| `/api/saving/*`             | saving-service:8083       |
+| `/api/installment/*`        | saving-service:8083       |
+| `/api/notification/*`       | notification-service:8084 |
+| `/api/groups/*`             | group-service:8085        |
+| `/api/group-members/*`      | group-service:8085        |
+| `/api/group-transactions/*` | group-service:8085        |
 
 ## Running
 
 ```bash
-# From project root
 docker compose up gateway --build
 ```
 
-## Configuration
+## Health Check
 
-The gateway uses Docker Compose networking. Services are accessible by their
-service names defined in `docker-compose.yml` (e.g., `service-a`, `service-b`).
-
-## Notes
-
-- Use service names (not `localhost`) for upstream URLs inside Docker
-- The gateway exposes port 8080 to the host
+```
+GET /health → {"status": "ok"}
+```
