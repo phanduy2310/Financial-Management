@@ -1,0 +1,344 @@
+openapi: 3.0.3
+info:
+  title: Group Service API
+  description: |
+    Collaboration Context — quản lý nhóm chi tiêu, thành viên, giao dịch nhóm và phân chia hóa đơn.
+    Routes được chia thành 3 prefix riêng: /api/groups, /api/group-members, /api/group-transactions.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:5444
+    description: Qua API Gateway (development)
+
+paths:
+  /health:
+    get:
+      summary: Health check (gateway)
+      operationId: healthCheck
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  # ─── Groups ───────────────────────────────────────────────────────────────
+
+  /api/groups:
+    post:
+      summary: Tạo nhóm mới
+      operationId: createGroup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GroupCreate'
+      responses:
+        '200':
+          description: Tạo thành công
+        '400':
+          description: Dữ liệu không hợp lệ
+
+  /api/groups/user/{user_id}:
+    get:
+      summary: Lấy danh sách nhóm của user
+      operationId: getGroupsOfUser
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Danh sách nhóm — trả về {message, data:[...]}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/groups/{id}:
+    patch:
+      summary: Cập nhật thông tin nhóm
+      operationId: updateGroup
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GroupCreate'
+      responses:
+        '200':
+          description: Cập nhật thành công
+        '404':
+          description: Không tìm thấy nhóm
+    delete:
+      summary: Xoá nhóm
+      operationId: deleteGroup
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Đã xoá
+
+  # ─── Group Members ────────────────────────────────────────────────────────
+
+  /api/group-members/{group_id}:
+    get:
+      summary: Lấy danh sách thành viên của nhóm
+      operationId: getMembers
+      parameters:
+        - name: group_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Danh sách thành viên — trả về {message, data:[...]}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/group-members/add:
+    post:
+      summary: Thêm thành viên vào nhóm
+      operationId: addMember
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [group_id, user_id]
+              properties:
+                group_id:
+                  type: integer
+                user_id:
+                  type: integer
+      responses:
+        '200':
+          description: Đã thêm thành viên
+        '400':
+          description: User đã là thành viên
+
+  /api/group-members/remove:
+    post:
+      summary: Xoá thành viên khỏi nhóm
+      operationId: removeMember
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [group_id, user_id]
+              properties:
+                group_id:
+                  type: integer
+                user_id:
+                  type: integer
+      responses:
+        '200':
+          description: Đã xoá thành viên
+
+  # ─── Group Transactions ───────────────────────────────────────────────────
+
+  /api/group-transactions:
+    post:
+      summary: Tạo giao dịch nhóm + chia tiền cho từng thành viên
+      operationId: createGroupTransaction
+      description: |
+        Tạo giao dịch nhóm và lưu phần chia tiền (shares).
+        Với mỗi share, gọi transaction-service để tạo personal transaction cho thành viên đó.
+        Nếu bất kỳ personal transaction nào thất bại, rollback toàn bộ.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GroupTransactionCreate'
+      responses:
+        '200':
+          description: Giao dịch nhóm đã được tạo
+        '400':
+          description: Dữ liệu không hợp lệ
+
+  /api/group-transactions/{group_id}:
+    get:
+      summary: Lấy danh sách giao dịch của nhóm
+      operationId: listGroupTransactions
+      parameters:
+        - name: group_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Danh sách giao dịch nhóm — trả về {message, data:[...]}
+
+  /api/group-transactions/detail/{transaction_id}:
+    get:
+      summary: Chi tiết giao dịch nhóm kèm danh sách shares
+      operationId: getGroupTransactionDetail
+      parameters:
+        - name: transaction_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Chi tiết giao dịch + shares
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupTransactionDetail'
+        '404':
+          description: Không tìm thấy
+
+  /api/group-transactions/{group_id}/summary:
+    get:
+      summary: Tổng kết thu/chi của nhóm
+      operationId: getGroupSummary
+      parameters:
+        - name: group_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Tổng kết thu/chi nhóm
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+
+    SuccessResponse:
+      type: object
+      description: Wrapper response dùng bởi helper success(res, data, message)
+      properties:
+        message:
+          type: string
+        data:
+          description: Payload — array hoặc object tuỳ endpoint
+
+    Group:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        owner_id:
+          type: integer
+        owner_name:
+          type: string
+        member_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    GroupCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        owner_id:
+          type: integer
+
+    GroupMember:
+      type: object
+      properties:
+        user_id:
+          type: integer
+        fullname:
+          type: string
+        email:
+          type: string
+        joined_at:
+          type: string
+          format: date-time
+
+    GroupTransactionCreate:
+      type: object
+      required: [group_id, user_id, type, amount]
+      properties:
+        group_id:
+          type: integer
+        user_id:
+          type: integer
+        type:
+          type: string
+          enum: [income, expense]
+        amount:
+          type: number
+          minimum: 1
+        category:
+          type: string
+        note:
+          type: string
+        shares:
+          type: array
+          description: Phân chia tiền cho từng thành viên — mỗi share tạo 1 personal transaction
+          items:
+            type: object
+            required: [user_id, amount]
+            properties:
+              user_id:
+                type: integer
+              amount:
+                type: number
+
+    GroupTransactionDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        group_id:
+          type: integer
+        user_id:
+          type: integer
+        type:
+          type: string
+        amount:
+          type: number
+        category:
+          type: string
+        note:
+          type: string
+        shares:
+          type: array
+          items:
+            type: object
+            properties:
+              user_id:
+                type: integer
+              amount:
+                type: number
