@@ -1,13 +1,23 @@
 const bcrypt = require("bcrypt");
 const Joi = require("joi");
+
 const User = require("../models/user.model");
+const {
+    REFRESH_TOKEN_COOKIE_NAME,
+    getRefreshTokenClearCookieOptions,
+    getRefreshTokenCookieOptions,
+} = require("../config/auth");
 const {
     signAccessToken,
     signRefreshToken,
     verifyRefreshToken,
 } = require("../utils/jwt");
+const {
+    hashRefreshToken,
+    refreshTokenMatchesStoredValue,
+} = require("../utils/refresh_token");
+const { serializeUser, serializeUsers } = require("../utils/user");
 
-// ==== SCHEMAS ====
 const registerSchema = Joi.object({
     fullname: Joi.string().min(3).required(),
     email: Joi.string().email().required(),
@@ -20,56 +30,61 @@ const loginSchema = Joi.object({
     password: Joi.string().required(),
 });
 
-// ==== REGISTER ====
+function buildAuthPayload(user) {
+    return {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        fullname: user.fullname,
+    };
+}
+
 exports.register = async (req, res) => {
     try {
         const { error } = registerSchema.validate(req.body);
         if (error) {
             return res.status(400).json({
-                message: "Dữ liệu không hợp lệ",
-                details: error.details.map((d) => d.message),
+                message: "Du lieu khong hop le",
+                details: error.details.map((detail) => detail.message),
             });
         }
 
         const { fullname, email, password } = req.body;
 
-        const exist = await User.query().findOne({ email });
-        if (exist) {
-            return res.status(400).json({ message: "Email đã tồn tại" });
+        const existingUser = await User.query().findOne({ email });
+        if (existingUser) {
+            return res.status(400).json({ message: "Email da ton tai" });
         }
 
-        const hashed = await bcrypt.hash(password, 10);
+        const hashedPassword = await bcrypt.hash(password, 10);
         const user = await User.query().insert({
             fullname,
             email,
-            password: hashed,
+            password: hashedPassword,
             role: "user",
         });
 
-        // Không trả password
-        delete user.password;
-
         return res.status(201).json({
             success: true,
-            message: "Đăng ký thành công",
-            data: user,
+            message: "Dang ky thanh cong",
+            data: serializeUser(user),
         });
     } catch (err) {
         console.error("REGISTER ERROR:", err);
-        return res
-            .status(500)
-            .json({ message: "Lỗi server", error: err.message });
+        return res.status(500).json({
+            message: "Loi server",
+            error: err.message,
+        });
     }
 };
 
-// ==== LOGIN ====
 exports.login = async (req, res) => {
     try {
         const { error } = loginSchema.validate(req.body);
         if (error) {
             return res.status(400).json({
-                message: "Dữ liệu không hợp lệ",
-                details: error.details.map((d) => d.message),
+                message: "Du lieu khong hop le",
+                details: error.details.map((detail) => detail.message),
             });
         }
 
@@ -77,101 +92,81 @@ exports.login = async (req, res) => {
         const user = await User.query().findOne({ email });
 
         if (!user) {
-            return res
-                .status(404)
-                .json({ message: "Không tìm thấy người dùng" });
+            return res.status(404).json({ message: "Khong tim thay nguoi dung" });
         }
 
-        const valid = await bcrypt.compare(password, user.password);
-        if (!valid) {
-            return res.status(401).json({ message: "Sai mật khẩu" });
+        const validPassword = await bcrypt.compare(password, user.password);
+        if (!validPassword) {
+            return res.status(401).json({ message: "Sai mat khau" });
         }
 
-        const payload = {
-            id: user.id,
-            email: user.email,
-            role: user.role,
-            fullname: user.fullname,
-        };
-
+        const payload = buildAuthPayload(user);
         const accessToken = signAccessToken(payload);
         const refreshToken = signRefreshToken(payload);
 
-        // Lưu refresh token vào DB (cần có cột refresh_token trong bảng users)
         await User.query().patchAndFetchById(user.id, {
-            refresh_token: refreshToken,
+            refresh_token: hashRefreshToken(refreshToken),
         });
 
-        // Set cookie httpOnly cho refresh token
-        res.cookie("refreshToken", refreshToken, {
-            httpOnly: true,
-            secure: false, // production nên để true + dùng HTTPS
-            sameSite: "strict",
-            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 ngày
-        });
-
-        delete user.password;
+        res.cookie(
+            REFRESH_TOKEN_COOKIE_NAME,
+            refreshToken,
+            getRefreshTokenCookieOptions()
+        );
 
         return res.json({
             success: true,
-            message: "Đăng nhập thành công",
+            message: "Dang nhap thanh cong",
             data: {
-                user,
+                user: serializeUser(user),
                 accessToken,
             },
         });
     } catch (err) {
         console.error("LOGIN ERROR:", err);
-        return res
-            .status(500)
-            .json({ message: "Lỗi server", error: err.message });
+        return res.status(500).json({
+            message: "Loi server",
+            error: err.message,
+        });
     }
 };
 
-// ==== REFRESH TOKEN ====
 exports.refreshToken = async (req, res) => {
     try {
-        const tokenFromCookie = req.cookies.refreshToken;
+        const tokenFromCookie = req.cookies[REFRESH_TOKEN_COOKIE_NAME];
         if (!tokenFromCookie) {
-            return res.status(401).json({ message: "Không có refresh token" });
+            return res.status(401).json({ message: "Khong co refresh token" });
         }
 
-        // verify refresh token
         const decoded = verifyRefreshToken(tokenFromCookie);
-
-        // check trong DB
         const user = await User.query().findById(decoded.id);
-        if (!user || user.refresh_token !== tokenFromCookie) {
-            return res
-                .status(401)
-                .json({ message: "Refresh token không hợp lệ" });
+
+        if (
+            !user ||
+            !refreshTokenMatchesStoredValue(tokenFromCookie, user.refresh_token)
+        ) {
+            return res.status(401).json({
+                message: "Refresh token khong hop le",
+            });
         }
 
-        const payload = {
-            id: user.id,
-            email: user.email,
-            role: user.role,
-            fullname: user.fullname,
-        };
-
+        const payload = buildAuthPayload(user);
         const newAccessToken = signAccessToken(payload);
         const newRefreshToken = signRefreshToken(payload);
 
-        // update refresh token trong DB + cookie
         await User.query().patchAndFetchById(user.id, {
-            refresh_token: newRefreshToken,
+            refresh_token: hashRefreshToken(newRefreshToken),
         });
 
-        res.cookie("refreshToken", newRefreshToken, {
-            httpOnly: true,
-            secure: false,
-            sameSite: "strict",
-            maxAge: 7 * 24 * 60 * 60 * 1000,
-        });
+        res.cookie(
+            REFRESH_TOKEN_COOKIE_NAME,
+            newRefreshToken,
+            getRefreshTokenCookieOptions()
+        );
 
         return res.json({
             success: true,
-            message: "Refresh token thành công",
+            message: "Refresh token thanh cong",
             data: {
                 accessToken: newAccessToken,
             },
@@ -179,44 +174,57 @@ exports.refreshToken = async (req, res) => {
     } catch (err) {
         console.error("REFRESH TOKEN ERROR:", err);
         return res.status(401).json({
-            message: "Refresh token không hợp lệ",
+            message: "Refresh token khong hop le",
             error: err.message,
         });
     }
 };
 
-// ==== LOGOUT ====
 exports.logout = async (req, res) => {
     try {
-        const tokenFromCookie = req.cookies.refreshToken;
+        const tokenFromCookie = req.cookies[REFRESH_TOKEN_COOKIE_NAME];
 
         if (tokenFromCookie) {
-            // decode thử để lấy id user (có thể ignore lỗi)
             try {
                 const decoded = verifyRefreshToken(tokenFromCookie);
-                await User.query().patchAndFetchById(decoded.id, {
-                    refresh_token: null,
-                });
-            } catch (e) {
-                // bỏ qua nếu verify fail
+                const user = await User.query()
+                    .findById(decoded.id)
+                    .select("id", "refresh_token");
+
+                if (
+                    user &&
+                    refreshTokenMatchesStoredValue(
+                        tokenFromCookie,
+                        user.refresh_token
+                    )
+                ) {
+                    await User.query().patchAndFetchById(decoded.id, {
+                        refresh_token: null,
+                    });
+                }
+            } catch (error) {
+                console.warn("LOGOUT TOKEN VERIFY FAILED:", error.message);
             }
         }
 
-        res.clearCookie("refreshToken");
+        res.clearCookie(
+            REFRESH_TOKEN_COOKIE_NAME,
+            getRefreshTokenClearCookieOptions()
+        );
 
         return res.json({
             success: true,
-            message: "Đăng xuất thành công",
+            message: "Dang xuat thanh cong",
         });
     } catch (err) {
         console.error("LOGOUT ERROR:", err);
-        return res
-            .status(500)
-            .json({ message: "Lỗi server", error: err.message });
+        return res.status(500).json({
+            message: "Loi server",
+            error: err.message,
+        });
     }
 };
 
-// ==== LẤY THÔNG TIN USER HIỆN TẠI ====
 exports.me = async (req, res) => {
     try {
         const user = await User.query()
@@ -224,20 +232,19 @@ exports.me = async (req, res) => {
             .select("id", "fullname", "email", "role", "created_at");
 
         if (!user) {
-            return res
-                .status(404)
-                .json({ message: "Không tìm thấy người dùng" });
+            return res.status(404).json({ message: "Khong tim thay nguoi dung" });
         }
 
         return res.json({
             success: true,
-            data: user,
+            data: serializeUser(user),
         });
     } catch (err) {
         console.error("ME ERROR:", err);
-        return res
-            .status(500)
-            .json({ message: "Lỗi server", error: err.message });
+        return res.status(500).json({
+            message: "Loi server",
+            error: err.message,
+        });
     }
 };
 
@@ -248,17 +255,19 @@ exports.getUserById = async (req, res) => {
             .select("id", "fullname", "email", "role", "created_at");
 
         if (!user) {
-            return res
-                .status(404)
-                .json({ message: "Không tìm thấy người dùng" });
+            return res.status(404).json({ message: "Khong tim thay nguoi dung" });
         }
 
-        return res.json({ success: true, data: user });
+        return res.json({
+            success: true,
+            data: serializeUser(user),
+        });
     } catch (err) {
         console.error("GET USER ERROR:", err);
-        return res
-            .status(500)
-            .json({ message: "Lỗi server", error: err.message });
+        return res.status(500).json({
+            message: "Loi server",
+            error: err.message,
+        });
     }
 };
 
@@ -267,9 +276,9 @@ exports.getUsersBulk = async (req, res) => {
         const { ids } = req.body;
 
         if (!Array.isArray(ids) || ids.length === 0) {
-            return res
-                .status(400)
-                .json({ message: "Danh sách ID không hợp lệ" });
+            return res.status(400).json({
+                message: "Danh sach ID khong hop le",
+            });
         }
 
         const users = await User.query()
@@ -279,13 +288,14 @@ exports.getUsersBulk = async (req, res) => {
         return res.json({
             success: true,
             count: users.length,
-            users,
+            users: serializeUsers(users),
         });
     } catch (err) {
         console.error("BULK USER ERROR:", err);
-        return res
-            .status(500)
-            .json({ message: "Lỗi server", error: err.message });
+        return res.status(500).json({
+            message: "Loi server",
+            error: err.message,
+        });
     }
 };
 
@@ -294,7 +304,7 @@ exports.findByEmail = async (req, res) => {
         const email = req.query.email;
 
         if (!email) {
-            return res.status(400).json({ message: "Email không hợp lệ" });
+            return res.status(400).json({ message: "Email khong hop le" });
         }
 
         const user = await User.query()
@@ -302,16 +312,20 @@ exports.findByEmail = async (req, res) => {
             .select("id", "fullname", "email", "role");
 
         if (!user) {
-            return res
-                .status(404)
-                .json({ message: "Không tìm thấy user với email này" });
+            return res.status(404).json({
+                message: "Khong tim thay user voi email nay",
+            });
         }
 
-        return res.json({ success: true, data: user });
+        return res.json({
+            success: true,
+            data: serializeUser(user),
+        });
     } catch (err) {
         console.error("FIND USER ERROR:", err);
-        return res
-            .status(500)
-            .json({ message: "Lỗi server", error: err.message });
+        return res.status(500).json({
+            message: "Loi server",
+            error: err.message,
+        });
     }
 };
