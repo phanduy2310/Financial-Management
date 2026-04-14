@@ -14,7 +14,7 @@ class Transaction extends Model {
         user_id:  { type: 'integer' },
         type:     { type: 'string', enum: ['income', 'expense'] },
         category: { type: 'string' },
-        amount:   { type: 'number' },
+        amount:   { type: 'number', minimum: 0.01 },
         date:     { type: 'string', format: 'date' },
         note:     { type: ['string', 'null'] },
       },

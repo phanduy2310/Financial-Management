@@ -12,6 +12,7 @@ exports.up = async function (knex) {
         t.date("date").notNullable();
         t.string("note");
         t.timestamps(true, true);
+        t.index(["user_id", "date"]); // index cho các query thường dùng
     });
 };
 

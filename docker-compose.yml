@@ -49,6 +49,23 @@ services:
     networks:
       - app-network
 
+  # ─── Transaction Service ─────────────────────────
+  transaction-service:
+    build: ./services/transaction-service
+    ports:
+      - "5001:5001"
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_USER: finance_user
+      MYSQL_PASSWORD: finance_pass
+      MYSQL_DATABASE: financial_transaction
+      PORT: 5001
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - app-network
+
   # ─── MySQL ───────────────────────────────────────
   mysql:
     image: mysql:8
