@@ -12,7 +12,7 @@ const registerSchema = Joi.object({
     fullname: Joi.string().min(3).required(),
     email: Joi.string().email().required(),
     password: Joi.string().min(6).required(),
-    role: Joi.string().valid("user", "admin", "parent").optional(),
+    role: Joi.any().forbidden(),
 });
 
 const loginSchema = Joi.object({
@@ -31,7 +31,7 @@ exports.register = async (req, res) => {
             });
         }
 
-        const { fullname, email, password, role } = req.body;
+        const { fullname, email, password } = req.body;
 
         const exist = await User.query().findOne({ email });
         if (exist) {
@@ -43,7 +43,7 @@ exports.register = async (req, res) => {
             fullname,
             email,
             password: hashed,
-            role: role, // default
+            role: "user",
         });
 
         // Không trả password
