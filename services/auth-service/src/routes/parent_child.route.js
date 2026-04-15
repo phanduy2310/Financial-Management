@@ -13,7 +13,7 @@ router.post(
 );
 
 // Child confirm
-router.post("/confirm", controller.confirmLink);
+router.post("/confirm", authMiddleware.authenticate, controller.confirmLink);
 
 // Parent list children
 router.get(
