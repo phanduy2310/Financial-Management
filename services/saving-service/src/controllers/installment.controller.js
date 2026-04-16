@@ -3,6 +3,25 @@ const InstallmentPayment = require("../models/installment_payment.model");
 const transactionClient = require("../clients/transaction.client");
 const notifyClient = require("../clients/notification.client");
 
+function buildHttpError(status, message, details) {
+    const err = new Error(message);
+    err.status = status;
+    err.details = details;
+    return err;
+}
+
+function sendError(res, err) {
+    if (err.status) {
+        const body = { message: err.message };
+        if (err.details) {
+            body.error = err.details;
+        }
+        return res.status(err.status).json(body);
+    }
+
+    return res.status(500).json({ error: err.message });
+}
+
 // 🆕 1. Tạo kế hoạch trả góp
 exports.create = async (req, res) => {
     try {
@@ -51,116 +70,134 @@ exports.create = async (req, res) => {
 exports.payInstallment = async (req, res) => {
     try {
         const { id } = req.params;
-        const plan = await InstallmentPlan.query().findById(id);
+        let updated;
+        let responseMessage;
+        let notificationPayload = null;
 
-        if (!plan)
-            return res
-                .status(404)
-                .json({ message: "Không tìm thấy khoản trả góp" });
+        await InstallmentPlan.transaction(async (trx) => {
+            const plan = await InstallmentPlan.query(trx).findById(id).forUpdate();
 
-        // 🔒 Kiểm tra trạng thái
-        if (plan.completed || plan.current_term >= plan.total_terms) {
-            return res.status(400).json({
-                message:
-                    "Khoản trả góp đã hoàn thành, không thể thanh toán thêm.",
-            });
-        }
+            if (!plan) {
+                throw buildHttpError(404, "Không tìm thấy khoản trả góp");
+            }
 
-        // 🧮 Tính toán dữ liệu mới
-        let newPaidAmount =
-            Number(plan.paid_amount) + Number(plan.monthly_payment);
-        let newTerm = plan.current_term + 1;
+            if (plan.completed || plan.current_term >= plan.total_terms) {
+                throw buildHttpError(
+                    400,
+                    "Khoản trả góp đã hoàn thành, không thể thanh toán thêm."
+                );
+            }
 
-        // Giới hạn không vượt tổng tiền
-        if (newPaidAmount > plan.total_amount) {
-            newPaidAmount = Number(plan.total_amount);
-        }
+            let newPaidAmount =
+                Number(plan.paid_amount) + Number(plan.monthly_payment);
+            const newTerm = plan.current_term + 1;
 
-        // Tiến độ %
-        const progress_percentage = Math.min(
-            (newPaidAmount / plan.total_amount) * 100,
-            100
-        );
+            if (newPaidAmount > plan.total_amount) {
+                newPaidAmount = Number(plan.total_amount);
+            }
 
-        const isCompleted =
-            newPaidAmount >= plan.total_amount || newTerm >= plan.total_terms;
-
-        // 🕓 Thời gian & note mặc định
-        const today = new Date().toISOString().slice(0, 19).replace("T", " ");
-        const note = `Thanh toán kỳ ${newTerm} (${new Date().toLocaleDateString(
-            "vi-VN"
-        )})`;
-
-        // 1️⃣ Gọi transaction service TRƯỚC khi lưu DB để tránh inconsistency
-        const transactionPayload = {
-            user_id: plan.user_id,
-            category: "Thanh toán khoản trả góp",
-            type: "expense",
-            amount: Number(plan.monthly_payment),
-            date: new Date().toISOString().slice(0, 10),
-            note: `Thanh toán kỳ ${newTerm} cho khoản trả góp: ${plan.title}`,
-        };
-        try {
-            console.log(
-                "[TRANSACTION SERVICE] Gửi payload:",
-                transactionPayload
+            const progressPercentage = Math.min(
+                (newPaidAmount / plan.total_amount) * 100,
+                100
             );
-            await transactionClient.post("/api/transactions", transactionPayload);
-        } catch (err) {
-            console.error("[TRANSACTION SERVICE ERROR]", {
-                message: err.message,
-                status: err.response?.status,
-                data: err.response?.data,
-            });
-            return res.status(500).json({
-                message: "Thanh toán kỳ nhưng tạo transaction thất bại",
-                error: err.message,
-            });
-        }
+            const isCompleted =
+                newPaidAmount >= plan.total_amount ||
+                newTerm >= plan.total_terms;
+            const today = new Date()
+                .toISOString()
+                .slice(0, 19)
+                .replace("T", " ");
+            const note = `Thanh toán kỳ ${newTerm} (${new Date().toLocaleDateString(
+                "vi-VN"
+            )})`;
+            const transactionPayload = {
+                user_id: plan.user_id,
+                category: "Thanh toán khoản trả góp",
+                type: "expense",
+                amount: Number(plan.monthly_payment),
+                date: new Date().toISOString().slice(0, 10),
+                note: `Thanh toán kỳ ${newTerm} cho khoản trả góp: ${plan.title}`,
+            };
 
-        // 2️⃣ Transaction service thành công → lưu DB
-        const updated = await plan.$query().patchAndFetch({
-            paid_amount: newPaidAmount,
-            current_term: newTerm,
-            progress_percentage: Number(progress_percentage.toFixed(2)),
-            completed: isCompleted,
+            try {
+                console.log(
+                    "[TRANSACTION SERVICE] Gửi payload:",
+                    transactionPayload
+                );
+                await transactionClient.post(
+                    "/api/transactions",
+                    transactionPayload
+                );
+            } catch (err) {
+                console.error("[TRANSACTION SERVICE ERROR]", {
+                    message: err.message,
+                    status: err.response?.status,
+                    data: err.response?.data,
+                });
+                throw buildHttpError(
+                    500,
+                    "Thanh toán kỳ nhưng tạo transaction thất bại",
+                    err.message
+                );
+            }
+
+            updated = await InstallmentPlan.query(trx).patchAndFetchById(id, {
+                paid_amount: newPaidAmount,
+                current_term: newTerm,
+                progress_percentage: Number(progressPercentage.toFixed(2)),
+                completed: isCompleted,
+            });
+
+            await InstallmentPayment.query(trx).insert({
+                plan_id: Number(id),
+                term_number: newTerm,
+                amount: Number(plan.monthly_payment),
+                note,
+                pay_date: today,
+            });
+
+            const remainingTerms = plan.total_terms - newTerm;
+            if (isCompleted) {
+                notificationPayload = {
+                    event: "INSTALLMENT_DUE_SOON",
+                    userId: plan.user_id,
+                    payload: {
+                        title: plan.title,
+                        due_date: plan.end_date,
+                        message: `Khoản trả góp "${plan.title}" đã hoàn thành!`,
+                    },
+                };
+            } else if (remainingTerms <= 2) {
+                notificationPayload = {
+                    event: "INSTALLMENT_DUE_SOON",
+                    userId: plan.user_id,
+                    payload: {
+                        title: plan.title,
+                        due_date: plan.end_date,
+                        message: `Còn ${remainingTerms} kỳ nữa là hoàn thành khoản trả góp "${plan.title}"`,
+                    },
+                };
+            }
+
+            responseMessage = isCompleted
+                ? "Khoản trả góp đã hoàn thành"
+                : "Đã thanh toán kỳ mới thành công";
         });
 
-        // 🪶 Ghi lịch sử thanh toán
-        await InstallmentPayment.query().insert({
-            plan_id: Number(id),
-            term_number: newTerm,
-            amount: Number(plan.monthly_payment),
-            note,
-            pay_date: today,
-        });
-
-        // Gửi notification (fire-and-forget)
-        const remainingTerms = plan.total_terms - newTerm;
-        if (isCompleted) {
-            // Hoàn thành toàn bộ
-            notifyClient.publish("INSTALLMENT_DUE_SOON", plan.user_id, {
-                title: plan.title,
-                due_date: plan.end_date,
-                message: `Khoản trả góp "${plan.title}" đã hoàn thành!`,
-            });
-        } else if (remainingTerms <= 2) {
-            // Còn ít kỳ, nhắc nhở
-            notifyClient.publish("INSTALLMENT_DUE_SOON", plan.user_id, {
-                title: plan.title,
-                due_date: plan.end_date,
-                message: `Còn ${remainingTerms} kỳ nữa là hoàn thành khoản trả góp "${plan.title}"`,
-            });
+        if (notificationPayload) {
+            notifyClient.publish(
+                notificationPayload.event,
+                notificationPayload.userId,
+                notificationPayload.payload
+            );
         }
 
         res.json({
-            message: isCompleted
-                ? "Khoản trả góp đã hoàn thành"
-                : "Đã thanh toán kỳ mới thành công",
+            message: responseMessage,
             plan: updated,
         });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        return sendError(res, err);
     }
 };
 
@@ -258,22 +295,23 @@ exports.delete = async (req, res) => {
     try {
         const { id } = req.params;
 
-        const plan = await InstallmentPlan.query().findById(id);
-        if (!plan) {
-            return res
-                .status(404)
-                .json({ message: "Không tìm thấy khoản trả góp để xóa" });
-        }
+        await InstallmentPlan.transaction(async (trx) => {
+            const plan = await InstallmentPlan.query(trx).findById(id).forUpdate();
 
-        // 1️⃣ Xóa lịch sử thanh toán trước
-        await InstallmentPayment.query().where("plan_id", id).delete();
+            if (!plan) {
+                throw buildHttpError(
+                    404,
+                    "Không tìm thấy khoản trả góp để xóa"
+                );
+            }
 
-        // 2️⃣ Xóa kế hoạch trả góp
-        await InstallmentPlan.query().deleteById(id);
+            await InstallmentPayment.query(trx).where("plan_id", id).delete();
+            await InstallmentPlan.query(trx).deleteById(id);
+        });
 
         res.json({ message: "Đã xóa khoản trả góp và lịch sử liên quan" });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        return sendError(res, err);
     }
 };
 

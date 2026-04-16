@@ -2,6 +2,25 @@ const SavingPlan = require("../models/saving.model");
 const transactionClient = require("../clients/transaction.client");
 const notifyClient = require("../clients/notification.client");
 
+function buildHttpError(status, message, details) {
+    const err = new Error(message);
+    err.status = status;
+    err.details = details;
+    return err;
+}
+
+function sendError(res, err) {
+    if (err.status) {
+        const body = { message: err.message };
+        if (err.details) {
+            body.error = err.details;
+        }
+        return res.status(err.status).json(body);
+    }
+
+    return res.status(500).json({ error: err.message });
+}
+
 exports.create = async (req, res) => {
     try {
         const { user_id, title, target_amount, start_date, end_date } =
@@ -55,16 +74,97 @@ exports.updateProgress = async (req, res) => {
         const { id } = req.params;
         const { current_amount } = req.body;
 
-        const plan = await SavingPlan.query().findById(id);
-        if (!plan) {
-            return res.status(404).json({ message: "Không tìm thấy kế hoạch" });
+        let updated;
+        let notifyPayload = null;
+
+        await SavingPlan.transaction(async (trx) => {
+            const plan = await SavingPlan.query(trx).findById(id).forUpdate();
+            if (!plan) {
+                throw buildHttpError(404, "Không tìm thấy kế hoạch");
+            }
+
+            const progressPercentage =
+                plan.target_amount > 0
+                    ? Math.min((current_amount / plan.target_amount) * 100, 100)
+                    : 0;
+            const isNowCompleted = current_amount >= plan.target_amount;
+
+            if (!plan.completed && isNowCompleted) {
+                const transactionPayload = {
+                    user_id: plan.user_id,
+                    category: "Thực hiện kế hoạch tiết kiệm",
+                    type: "expense",
+                    amount: Number(plan.target_amount),
+                    date: new Date().toISOString().slice(0, 10),
+                    note: `Hoàn thành kế hoạch tiết kiệm: ${plan.title}`,
+                };
+
+                try {
+                    await transactionClient.post(
+                        "/api/transactions",
+                        transactionPayload
+                    );
+                } catch (err) {
+                    console.error("[TRANSACTION SERVICE ERROR]", {
+                        message: err.message,
+                        status: err.response?.status,
+                        data: err.response?.data,
+                    });
+                    throw buildHttpError(
+                        500,
+                        "Cập nhật tiến độ nhưng tạo transaction thất bại",
+                        err.message
+                    );
+                }
+            }
+
+            updated = await SavingPlan.query(trx).patchAndFetchById(id, {
+                current_amount,
+                progress_percentage: Number(progressPercentage.toFixed(2)),
+                completed: isNowCompleted,
+            });
+
+            if (isNowCompleted) {
+                notifyPayload = {
+                    userId: plan.user_id,
+                    title: plan.title,
+                };
+            }
+        });
+
+        if (notifyPayload) {
+            notifyClient.publish("SAVING_PLAN_COMPLETED", notifyPayload.userId, {
+                title: notifyPayload.title,
+            });
         }
 
-        const progressPercentage = plan.target_amount > 0
-            ? Math.min((current_amount / plan.target_amount) * 100, 100)
-            : 0;
+        res.json({
+            message: "Cập nhật tiến độ thành công",
+            plan: updated,
+        });
+    } catch (err) {
+        return sendError(res, err);
+    }
+};
 
-        if (!plan.completed && current_amount >= plan.target_amount) {
+exports.markCompleted = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        let updated;
+        let notifyPayload = null;
+
+        await SavingPlan.transaction(async (trx) => {
+            const plan = await SavingPlan.query(trx).findById(id).forUpdate();
+
+            if (!plan) {
+                throw buildHttpError(404, "Không tìm thấy kế hoạch");
+            }
+
+            if (plan.completed) {
+                throw buildHttpError(400, "Kế hoạch đã hoàn thành trước đó");
+            }
+
             const transactionPayload = {
                 user_id: plan.user_id,
                 category: "Thực hiện kế hoạch tiết kiệm",
@@ -85,88 +185,27 @@ exports.updateProgress = async (req, res) => {
                     status: err.response?.status,
                     data: err.response?.data,
                 });
-                return res.status(500).json({
-                    message: "Cập nhật tiến độ nhưng tạo transaction thất bại",
-                    error: err.message,
-                });
+                throw buildHttpError(
+                    500,
+                    "Hoàn thành kế hoạch nhưng tạo transaction thất bại",
+                    err.message
+                );
             }
-        }
 
-        const isNowCompleted = current_amount >= plan.target_amount;
-        const updated = await plan.$query().patchAndFetch({
-            current_amount,
-            progress_percentage: Number(progressPercentage.toFixed(2)),
-            completed: isNowCompleted,
-        });
+            updated = await SavingPlan.query(trx).patchAndFetchById(id, {
+                completed: true,
+                current_amount: Number(plan.target_amount),
+                progress_percentage: 100,
+            });
 
-        if (isNowCompleted) {
-            notifyClient.publish("SAVING_PLAN_COMPLETED", plan.user_id, {
+            notifyPayload = {
+                userId: plan.user_id,
                 title: plan.title,
-            });
-        }
-
-        res.json({
-            message: "Cập nhật tiến độ thành công",
-            plan: updated,
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-};
-
-exports.markCompleted = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const plan = await SavingPlan.query().findById(id);
-
-        if (!plan) {
-            return res.status(404).json({ message: "Không tìm thấy kế hoạch" });
-        }
-
-        if (plan.completed) {
-            return res
-                .status(400)
-                .json({ message: "Kế hoạch đã hoàn thành trước đó" });
-        }
-
-        const currentAmount = Number(plan.target_amount);
-        const updated = await plan.$query().patchAndFetch({
-            completed: true,
-            current_amount: currentAmount,
-            progress_percentage: 100,
+            };
         });
 
-        const transactionPayload = {
-            user_id: plan.user_id,
-            category: "Thực hiện kế hoạch tiết kiệm",
-            type: "expense",
-            amount: Number(plan.target_amount),
-            date: new Date().toISOString().slice(0, 10),
-            note: `Hoàn thành kế hoạch tiết kiệm: ${plan.title}`,
-        };
-
-        try {
-            await transactionClient.post("/api/transactions", transactionPayload);
-        } catch (err) {
-            console.error("[TRANSACTION SERVICE ERROR]", {
-                message: err.message,
-                status: err.response?.status,
-                data: err.response?.data,
-            });
-            await plan.$query().patch({
-                completed: false,
-                current_amount: plan.current_amount,
-                progress_percentage: plan.progress_percentage || 0,
-            });
-            return res.status(500).json({
-                message: "Hoàn thành kế hoạch nhưng tạo transaction thất bại",
-                error: err.message,
-            });
-        }
-
-        // Gửi notification hoàn thành kế hoạch (fire-and-forget)
-        notifyClient.publish("SAVING_PLAN_COMPLETED", plan.user_id, {
-            title: plan.title,
+        notifyClient.publish("SAVING_PLAN_COMPLETED", notifyPayload.userId, {
+            title: notifyPayload.title,
         });
 
         return res.json({
@@ -174,7 +213,7 @@ exports.markCompleted = async (req, res) => {
             plan: updated,
         });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        return sendError(res, err);
     }
 };
 

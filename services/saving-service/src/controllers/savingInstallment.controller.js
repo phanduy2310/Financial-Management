@@ -1,6 +1,20 @@
 const SavingInstallment = require("../models/savingInstallment.model");
 const SavingPlan = require("../models/saving.model");
 
+function buildHttpError(status, message) {
+    const err = new Error(message);
+    err.status = status;
+    return err;
+}
+
+function sendError(res, err) {
+    if (err.status) {
+        return res.status(err.status).json({ message: err.message });
+    }
+
+    return res.status(500).json({ error: err.message });
+}
+
 exports.addInstallment = async (req, res) => {
     try {
         const savingPlanId =
@@ -13,27 +27,36 @@ exports.addInstallment = async (req, res) => {
                 .json({ message: "Thiếu thông tin cần thiết" });
         }
 
-        const plan = await SavingPlan.query().findById(savingPlanId);
-        if (!plan) {
-            return res.status(404).json({ message: "Không tìm thấy kế hoạch" });
-        }
+        let installment;
+        let progress;
 
-        const installment = await SavingInstallment.query().insert({
-            saving_plan_id: savingPlanId,
-            amount,
-            note,
-            payment_date: payment_date || new Date().toISOString(),
-        });
+        await SavingPlan.transaction(async (trx) => {
+            const plan = await SavingPlan.query(trx)
+                .findById(savingPlanId)
+                .forUpdate();
 
-        const newAmount = Number(plan.current_amount) + Number(amount);
-        const progress = plan.target_amount > 0
-            ? Math.min((newAmount / plan.target_amount) * 100, 100)
-            : 0;
+            if (!plan) {
+                throw buildHttpError(404, "Không tìm thấy kế hoạch");
+            }
 
-        await plan.$query().patch({
-            current_amount: newAmount,
-            progress_percentage: Number(progress.toFixed(2)),
-            completed: newAmount >= plan.target_amount,
+            installment = await SavingInstallment.query(trx).insert({
+                saving_plan_id: savingPlanId,
+                amount,
+                note,
+                payment_date: payment_date || new Date().toISOString(),
+            });
+
+            const newAmount = Number(plan.current_amount) + Number(amount);
+            progress =
+                plan.target_amount > 0
+                    ? Math.min((newAmount / plan.target_amount) * 100, 100)
+                    : 0;
+
+            await SavingPlan.query(trx).patchAndFetchById(savingPlanId, {
+                current_amount: newAmount,
+                progress_percentage: Number(progress.toFixed(2)),
+                completed: newAmount >= plan.target_amount,
+            });
         });
 
         res.status(201).json({
@@ -42,7 +65,7 @@ exports.addInstallment = async (req, res) => {
             new_progress: Number(progress.toFixed(2)),
         });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        return sendError(res, err);
     }
 };
 
@@ -61,42 +84,50 @@ exports.getByPlan = async (req, res) => {
 exports.delete = async (req, res) => {
     try {
         const { id } = req.params;
-        const installment = await SavingInstallment.query().findById(id);
-        if (!installment) {
-            return res
-                .status(404)
-                .json({ message: "Không tìm thấy khoản trả góp" });
-        }
 
-        const plan = await SavingPlan.query().findById(
-            installment.saving_plan_id
-        );
-        if (!plan) {
-            // Plan already deleted; just remove the installment
-            await SavingInstallment.query().deleteById(id);
-            return res.json({ message: "Đã xóa khoản trả góp", new_progress: 0 });
-        }
-        const newAmount = Math.max(
-            Number(plan.current_amount) - Number(installment.amount),
-            0
-        );
-        const progress = plan.target_amount > 0
-            ? Math.min((newAmount / plan.target_amount) * 100, 100)
-            : 0;
+        let progress = 0;
 
-        await plan.$query().patch({
-            current_amount: newAmount,
-            progress_percentage: Number(progress.toFixed(2)),
-            completed: newAmount >= plan.target_amount,
+        await SavingPlan.transaction(async (trx) => {
+            const installment = await SavingInstallment.query(trx)
+                .findById(id)
+                .forUpdate();
+
+            if (!installment) {
+                throw buildHttpError(404, "Không tìm thấy khoản trả góp");
+            }
+
+            const plan = await SavingPlan.query(trx)
+                .findById(installment.saving_plan_id)
+                .forUpdate();
+
+            if (!plan) {
+                await SavingInstallment.query(trx).deleteById(id);
+                return;
+            }
+
+            const newAmount = Math.max(
+                Number(plan.current_amount) - Number(installment.amount),
+                0
+            );
+            progress =
+                plan.target_amount > 0
+                    ? Math.min((newAmount / plan.target_amount) * 100, 100)
+                    : 0;
+
+            await SavingPlan.query(trx).patchAndFetchById(plan.id, {
+                current_amount: newAmount,
+                progress_percentage: Number(progress.toFixed(2)),
+                completed: newAmount >= plan.target_amount,
+            });
+
+            await SavingInstallment.query(trx).deleteById(id);
         });
-
-        await SavingInstallment.query().deleteById(id);
 
         res.json({
             message: "Đã xóa khoản trả góp",
             new_progress: Number(progress.toFixed(2)),
         });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        return sendError(res, err);
     }
 };
