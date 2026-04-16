@@ -10,8 +10,8 @@
 
 | Name | Student ID | Role | Contribution |
 |------|------------|------|--------------|
-| Phan Văn Duy | B22DCCN156 | Student | Transaction Service, Saving Service |
-| Bùi Văn Đạt | B22DCCN180 | Student | Auth Service, Group Service |
+| Phan Văn Duy | B22DCCN156 | Student | Transaction Service, Group Service |
+| Bùi Văn Đạt | B22DCCN180 | Student | Auth Service, Saving Service |
 | Trần Đức Hoàng | B22DCCN347 | Student | API Gateway, Notification Service |
 
 ---

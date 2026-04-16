@@ -5,9 +5,11 @@ class TransactionService {
         return Transaction.query().insert(data);
     }
 
-    getByUser(user_id) {
+    getAllByMonth(user_id, month, year) {
         return Transaction.query()
             .where("user_id", user_id)
+            .andWhereRaw("EXTRACT(MONTH FROM date) = ?", [month])
+            .andWhereRaw("EXTRACT(YEAR FROM date) = ?", [year])
             .orderBy("date", "desc");
     }
 
@@ -26,8 +28,7 @@ class TransactionService {
         return Transaction.query().deleteById(id);
     }
 
-     // ========= STATS =========
-
+    // ========= STATS =========
     getStatsByMonth(user_id, month, year) {
         return Transaction.query()
             .where("user_id", user_id)
@@ -37,6 +38,60 @@ class TransactionService {
             .sum("amount as total")
             .groupBy("type");
     }
+
+    getStatsByYear(user_id, year) {
+        return Transaction.query()
+            .where("user_id", user_id)
+            .andWhereRaw("EXTRACT(YEAR FROM date) = ?", [year])
+            .select("type")
+            .sum("amount as total")
+            .groupBy("type");
+    }
+
+    getOpeningBalanceByMonth(user_id, month, year) {
+        const firstDayOfMonth = new Date(year, month - 1, 1);
+
+        return Transaction.query()
+            .where("user_id", user_id)
+            .where("date", "<", firstDayOfMonth)
+            .select("type")
+            .sum("amount as total")
+            .groupBy("type")
+            .then((rows) => {
+                let totalIncomeBefore = 0;
+                let totalExpenseBefore = 0;
+
+                for (const item of rows) {
+                    if (item.type === "income") totalIncomeBefore = Number(item.total) || 0;
+                    if (item.type === "expense") totalExpenseBefore = Number(item.total) || 0;
+                }
+
+                return totalIncomeBefore - totalExpenseBefore;
+            });
+    }
+
+    getOpeningBalanceByYear(user_id, year) {
+        const firstDayOfYear = new Date(year, 0, 1);
+
+        return Transaction.query()
+            .where("user_id", user_id)
+            .where("date", "<", firstDayOfYear)
+            .select("type")
+            .sum("amount as total")
+            .groupBy("type")
+            .then((rows) => {
+                let totalIncomeBefore = 0;
+                let totalExpenseBefore = 0;
+
+                for (const item of rows) {
+                    if (item.type === "income") totalIncomeBefore = Number(item.total) || 0;
+                    if (item.type === "expense") totalExpenseBefore = Number(item.total) || 0;
+                }
+
+                return totalIncomeBefore - totalExpenseBefore;
+            });
+    }
+
 
     getStatsByCategory(user_id, month, year) {
         return Transaction.query()
@@ -48,35 +103,6 @@ class TransactionService {
             .groupBy("type", "category");
     }
 
-    getStatsByYear(user_id, year) {
-        return Transaction.query()
-            .where("user_id", user_id)
-            .andWhereRaw("EXTRACT(YEAR FROM date) = ?", [year])
-            .select(
-                Transaction.knex().raw("EXTRACT(MONTH FROM date) as month"),
-                "type"
-            )
-            .sum("amount as total")
-            .groupBy("month", "type")
-            .orderBy("month");
-    }
-
-    getSummaryByUser(user_id) {
-        return Transaction.query()
-            .where("user_id", user_id)
-            .select("type")
-            .sum("amount as total")
-            .groupBy("type");
-    }
-
-    getStatsByRange(user_id, from, to) {
-        return Transaction.query()
-            .where("user_id", user_id)
-            .whereBetween("date", [from, to])
-            .select("type")
-            .sum("amount as total")
-            .groupBy("type");
-    }
 }
 
 module.exports = new TransactionService();

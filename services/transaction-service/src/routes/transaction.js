@@ -1,22 +1,22 @@
 const express = require("express");
 const router = express.Router();
 const controller = require("../controllers/transaction");
+const auth = require("../middlewares/auth")
 
-router.post("/", controller.create);
+router.post("/", auth, controller.create);
 
-// Static routes TRƯỚC dynamic routes
-router.get("/detail/:id", controller.getTransactionDetail);
-router.put("/:id", controller.updateTransaction);
-router.delete("/:id", controller.deleteTransaction);
+router.get("/detail/:id", controller.getTransactionDetail); 
+router.put("/:id", auth,  controller.updateTransaction);
+router.delete("/:id", auth, controller.deleteTransaction);
+// lấy tất cả tracsaction của tháng
+router.get("/", auth, controller.getAllByMonth);
 
-router.get("/stats/category/:userId", controller.getStatsByCategory);
-router.get("/stats/summary/:userId", controller.getSummaryStats);
-router.get("/stats/year/:userId/:year", controller.getStatsByYear);
-router.get("/stats/range/:userId/:fromDate/:toDate", controller.getStatsByRange);
-router.get("/stats/:userId/:month/:year", controller.getStatsByMonth);
+// mỗi tháng cần tính tổng nhập, tổng chi của tháng đó, số dư đầu tháng; tương tự cho thống kê theo năm
+//stats/summary?period=month&month=4&year=2026
+router.get("/stats/summary", auth, controller.getStatsSummary);
+//thống kê theo category mỗi tháng: nhưng chưa có quản lí category nên chưa xử lí được
+router.get("/stats/category", auth, controller.getStatsByCategory);
 
-// Dynamic catch-all CUỐI CÙNG
-router.get("/:user_id", controller.getAllByUser);
 
 
 module.exports = router;

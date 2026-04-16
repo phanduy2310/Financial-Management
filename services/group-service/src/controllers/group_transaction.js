@@ -64,12 +64,7 @@ exports.getTransactionDetail = async (req, res) => {
             ...shares.map((s) => s.user_id),
         ]);
 
-        const userResp = await authClient.post("/api/auth/users/bulk", {
-            ids: [...userIds],
-        });
-
-
-        const userMap = Object.fromEntries(users.map((u) => [userIds, u]));
+        const userMap = Object.fromEntries(userIds.map((u) => [u.id, u]));
         transaction.user = userMap[transaction.user_id] || null;
         const sharesWithUser = shares.map((s) => ({
             ...s,

@@ -46,7 +46,7 @@ exports.getMembers = async (req, res) => {
             return success(res, []);
         }
 
-        const userMap = Object.fromEntries(users.map((u) => [userIds, u]));
+        const userMap = Object.fromEntries(userIds.map((u) => [u.id, u]));
         const enriched = membersList.map((m) => ({
             ...m,
             user: userMap[m.user_id] || null,

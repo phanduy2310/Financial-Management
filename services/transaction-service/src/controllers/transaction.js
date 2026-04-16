@@ -6,33 +6,46 @@ const { success, error } = require("../utils/response");
 // ==============================
 exports.create = async (req, res) => {
     try {
-        const required = ["user_id", "type", "category", "amount", "date"];
+        const required = ["type", "category", "amount", "date"];
         for (const field of required) {
             if (!req.body[field]) {
-                return error(res, `Missing required field: ${field}`, 400);
+                return error(res, `Missing required field: ${field}`, 400, "MISSING_REQUIRED_FIELD");
             }
         }
 
-        const { user_id, type, category, amount, date, note } = req.body;
-        const result = await service.create({ user_id, type, category, amount, date, note });
+        const { type, category, amount, date, note } = req.body;
+        const result = await service.create({ user_id: req.user.id, type, category, amount, date, note });
 
-        success(res, result, "Tạo giao dịch thành công");
+        success(res, result, "Tạo giao dịch thành công", 201);
     } catch (err) {
-        console.error("[CREATE TRANSACTION ERROR]", err);
-        error(res);
+        console.error("CREATE TRANSACTION ERROR", err);
+        error(res, "Không thể tạo giao dịch", 500, "CREATE_TRANSACTION_ERROR");
     }
 };
 
 // ==============================
-// GET ALL BY USER
+// GET ALL BY Month
 // ==============================
-exports.getAllByUser = async (req, res) => {
+exports.getAllByMonth = async (req, res) => {
     try {
-        const result = await service.getByUser(req.params.user_id);
-        success(res, result);
+        const userId = req.user.id;
+        const month = Number(req.query.month) || new Date().getMonth() + 1;
+        const year = Number(req.query.year) || new Date().getFullYear();
+
+        if (month < 1 || month > 12) {
+            return error(res, "Month must be between 1 and 12", 400, "INVALID_MONTH");
+        }
+
+        if (year < 2000 || year > 3000) {
+            return error(res, "Invalid year", 400, "INVALID_YEAR");
+        }
+
+        const result = await service.getAllByMonth(userId, month, year);
+
+        return success(res, result, "Lấy danh sách giao dịch theo tháng thành công");
     } catch (err) {
         console.error("[GET TRANSACTION ERROR]", err);
-        error(res);
+        return error(res, "Không thể lấy danh sách giao dịch", 500, "GET_TRANSACTION_ERROR");
     }
 };
 
@@ -42,12 +55,13 @@ exports.getAllByUser = async (req, res) => {
 exports.getTransactionDetail = async (req, res) => {
     try {
         const result = await service.getById(req.params.id);
-        if (!result) return error(res, "Giao dịch không tìm thấy", 404);
+        if (!result) return error(res, "Giao dịch không tìm thấy", 404, "NOT_FOUND");
+        if (result.user_id !== req.user.id) return error(res, "Không có quyền truy cập", 403, "FORBIDDEN");
 
         success(res, result);
     } catch (err) {
         console.error("[GET DETAIL ERROR]", err);
-        error(res);
+        error(res, "GET DETAIL ERROR", 500, "GET_DETAIL_ERROR");
     }
 };
 
@@ -56,14 +70,17 @@ exports.getTransactionDetail = async (req, res) => {
 // ==============================
 exports.updateTransaction = async (req, res) => {
     try {
-        const { type, category, amount, date, note } = req.body;
-        const updated = await service.update(req.params.id, { type, category, amount, date, note });
-        if (!updated) return error(res, "Giao dịch không tìm thấy", 404);
+        const existing = await service.getById(req.params.id);
+        if (!existing) return error(res, "Giao dịch không tìm thấy", 404, "NOT_FOUND");
+        if (existing.user_id !== req.user.id) return error(res, "Không có quyền truy cập", 403, "FORBIDDEN");
 
-        success(res, null, "Cập nhật giao dịch thành công");
+        const { type, category, amount, date, note } = req.body;
+        await service.update(req.params.id, { type, category, amount, date, note });
+
+        success(res, null, "Cập nhật giao dịch thành công", 200);
     } catch (err) {
         console.error("[UPDATE ERROR]", err);
-        error(res);
+        error(res, "UPDATE ERROR", 500, "UPDATE_ERROR");
     }
 };
 
@@ -72,30 +89,15 @@ exports.updateTransaction = async (req, res) => {
 // ==============================
 exports.deleteTransaction = async (req, res) => {
     try {
-        const deleted = await service.delete(req.params.id);
-        if (!deleted) return error(res, "Giao dịch không tìm thấy", 404);
+        const existing = await service.getById(req.params.id);
+        if (!existing) return error(res, "Giao dịch không tìm thấy", 404, "NOT_FOUND");
+        if (existing.user_id !== req.user.id) return error(res, "Không có quyền truy cập", 403, "FORBIDDEN");
 
+        await service.delete(req.params.id);
         success(res, null, "Xóa giao dịch thành công");
     } catch (err) {
         console.error("[DELETE ERROR]", err);
-        error(res);
-    }
-};
-
-// ==============================
-// STATS MONTH
-// ==============================
-exports.getStatsByMonth = async (req, res) => {
-    try {
-        const { userId, month, year } = req.params;
-        if (!userId || !month || !year)
-            return error(res, "Missing userId, month or year", 400);
-
-        const result = await service.getStatsByMonth(userId, month, year);
-        success(res, result);
-    } catch (err) {
-        console.error("[STATS MONTH ERROR]", err);
-        error(res);
+        error(res, "DELETE ERROR", 500, "DELETE_ERROR");
     }
 };
 
@@ -104,95 +106,111 @@ exports.getStatsByMonth = async (req, res) => {
 // ==============================
 exports.getStatsByCategory = async (req, res) => {
     try {
-        const { userId } = req.params;
-        const month = req.query.month || new Date().getMonth() + 1;
-        const year = req.query.year || new Date().getFullYear();
+        const userId = req.user.id;
+        const month = Number(req.query.month) || new Date().getMonth() + 1; //new Date().getMonth() trong JavaScript trả về tháng từ 0 đến 11, không phải từ 1 đến 12.
+        const year = Number(req.query.year) || new Date().getFullYear();
+
+        if (month < 1 || month > 12) {
+            return error(res, "Month must be between 1 and 12", 400, "INVALID_MONTH");
+        }
+
+        if (year < 2000 || year > 3000) {
+            return error(res, "Invalid year", 400, "INVALID_YEAR");
+        }
 
         const result = await service.getStatsByCategory(userId, month, year);
-        success(res, result);
+
+        return success(res, result, "Lấy thống kê theo danh mục thành công");
     } catch (err) {
         console.error("[STATS CATEGORY ERROR]", err);
-        error(res);
+        return error(
+            res,
+            "Không thể lấy thống kê theo danh mục",
+            500,
+            "STATS_CATEGORY_ERROR"
+        );
     }
 };
 
 // ==============================
 // SUMMARY
-// ==============================
-exports.getSummaryStats = async (req, res) => {
+// thống kê theo tháng hoặc theo năm
+exports.getStatsSummary = async (req, res) => {
     try {
-        const { userId } = req.params;
+        const userId = req.user.id;
+        const period = req.query.period || "month";
+        const currentDate = new Date();
 
-        const rows = await service.getSummaryByUser(userId);
-        let income = 0,
-            expense = 0;
+        const month = Number(req.query.month) || currentDate.getMonth() + 1;
+        const year = Number(req.query.year) || currentDate.getFullYear();
 
-        rows.forEach(({ type, total }) => {
-            if (type === "income") income = Number(total);
-            if (type === "expense") expense = Number(total);
-        });
+        if (!["month", "year"].includes(period)) {
+            return error(res, "Invalid period", 400, "INVALID_PERIOD");
+        }
 
-        success(res, {
-            income,
-            expense,
-            balance: income - expense,
-        });
+        if (period === "month" && (month < 1 || month > 12)) {
+            return error(res, "Month must be between 1 and 12", 400, "INVALID_MONTH");
+        }
+
+        if (year < 2000 || year > 3000) {
+            return error(res, "Invalid year", 400, "INVALID_YEAR");
+        }
+
+        let stats = [];
+        let openingBalance = 0;
+        let result = {};
+
+        if (period === "month") {
+            stats = await service.getStatsByMonth(userId, month, year);
+            openingBalance = await service.getOpeningBalanceByMonth(userId, month, year);
+
+            let totalIncome = 0;
+            let totalExpense = 0;
+
+            for (const item of stats) {
+                if (item.type === "income") totalIncome = Number(item.total) || 0;
+                if (item.type === "expense") totalExpense = Number(item.total) || 0;
+            }
+
+            result = {
+                period,
+                month,
+                year,
+                opening_balance: openingBalance,
+                total_income: totalIncome,
+                total_expense: totalExpense,
+                closing_balance: openingBalance + totalIncome - totalExpense
+            };
+        }
+
+        if (period === "year") {
+            stats = await service.getStatsByYear(userId, year);
+            openingBalance = await service.getOpeningBalanceByYear(userId, year);
+
+            let totalIncome = 0;
+            let totalExpense = 0;
+
+            for (const item of stats) {
+                if (item.type === "income") totalIncome = Number(item.total) || 0;
+                if (item.type === "expense") totalExpense = Number(item.total) || 0;
+            }
+
+            result = {
+                period,
+                year,
+                opening_balance: openingBalance,
+                total_income: totalIncome,
+                total_expense: totalExpense,
+                closing_balance: openingBalance + totalIncome - totalExpense
+            };
+        }
+
+        return success(res, result, "Lấy thống kê tổng quan thành công");
     } catch (err) {
-        console.error("[SUMMARY ERROR]", err);
-        error(res);
+        console.error("[STATS SUMMARY ERROR]", err);
+        return error(res, "Không thể lấy thống kê tổng quan", 500, "STATS_SUMMARY_ERROR");
     }
 };
 
-// ==============================
-// STATS YEAR
-// ==============================
-exports.getStatsByYear = async (req, res) => {
-    try {
-        const { userId, year } = req.params;
-        const rawStats = await service.getStatsByYear(userId, year);
 
-        const monthly = {};
-        rawStats.forEach(({ month, type, total }) => {
-            if (!monthly[month]) monthly[month] = { income: 0, expense: 0 };
-            monthly[month][type] = Number(total);
-        });
-
-        success(res, monthly);
-    } catch (err) {
-        console.error("[STATS YEAR ERROR]", err);
-        error(res);
-    }
-};
-
-// ==============================
-// RANGE STATS
-// ==============================
-exports.getStatsByRange = async (req, res) => {
-    try {
-        const { userId, fromDate, toDate } = req.params;
-
-        if (!userId || !fromDate || !toDate)
-            return error(res, "Missing userId, fromDate or toDate", 400);
-
-        const stats = await service.getStatsByRange(userId, fromDate, toDate);
-
-        let income = 0,
-            expense = 0;
-        stats.forEach(({ type, total }) => {
-            if (type === "income") income = Number(total);
-            if (type === "expense") expense = Number(total);
-        });
-
-        success(res, {
-            from: fromDate,
-            to: toDate,
-            income,
-            expense,
-            balance: income - expense,
-        });
-    } catch (err) {
-        console.error("[STATS RANGE ERROR]", err);
-        error(res);
-    }
-};
 
