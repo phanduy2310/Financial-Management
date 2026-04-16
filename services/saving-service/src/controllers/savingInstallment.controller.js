@@ -1,11 +1,11 @@
 const SavingInstallment = require("../models/savingInstallment.model");
 const SavingPlan = require("../models/saving.model");
-
-function buildHttpError(status, message) {
-    const err = new Error(message);
-    err.status = status;
-    return err;
-}
+const {
+    applySavingPlanState,
+    buildHttpError,
+    loadSavingPlanForUpdate,
+    publishSavingPlanCompleted,
+} = require("../services/savingPlanState.service");
 
 function sendError(res, err) {
     if (err.status) {
@@ -29,15 +29,10 @@ exports.addInstallment = async (req, res) => {
 
         let installment;
         let progress;
+        let notifyPayload = null;
 
         await SavingPlan.transaction(async (trx) => {
-            const plan = await SavingPlan.query(trx)
-                .findById(savingPlanId)
-                .forUpdate();
-
-            if (!plan) {
-                throw buildHttpError(404, "Không tìm thấy kế hoạch");
-            }
+            const plan = await loadSavingPlanForUpdate(trx, savingPlanId);
 
             installment = await SavingInstallment.query(trx).insert({
                 saving_plan_id: savingPlanId,
@@ -52,12 +47,18 @@ exports.addInstallment = async (req, res) => {
                     ? Math.min((newAmount / plan.target_amount) * 100, 100)
                     : 0;
 
-            await SavingPlan.query(trx).patchAndFetchById(savingPlanId, {
-                current_amount: newAmount,
-                progress_percentage: Number(progress.toFixed(2)),
-                completed: newAmount >= plan.target_amount,
+            const result = await applySavingPlanState({
+                trx,
+                plan,
+                nextCurrentAmount: newAmount,
+                completionErrorMessage:
+                    "Thêm khoản tiết kiệm nhưng tạo transaction thất bại",
             });
+
+            notifyPayload = result.notificationPayload;
         });
+
+        publishSavingPlanCompleted(notifyPayload);
 
         res.status(201).json({
             message: "Đã thêm khoản trả góp",
@@ -114,10 +115,12 @@ exports.delete = async (req, res) => {
                     ? Math.min((newAmount / plan.target_amount) * 100, 100)
                     : 0;
 
-            await SavingPlan.query(trx).patchAndFetchById(plan.id, {
-                current_amount: newAmount,
-                progress_percentage: Number(progress.toFixed(2)),
-                completed: newAmount >= plan.target_amount,
+            await applySavingPlanState({
+                trx,
+                plan,
+                nextCurrentAmount: newAmount,
+                completionErrorMessage:
+                    "Cập nhật kế hoạch tiết kiệm thất bại",
             });
 
             await SavingInstallment.query(trx).deleteById(id);

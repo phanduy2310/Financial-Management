@@ -1,13 +1,10 @@
 const SavingPlan = require("../models/saving.model");
-const transactionClient = require("../clients/transaction.client");
-const notifyClient = require("../clients/notification.client");
-
-function buildHttpError(status, message, details) {
-    const err = new Error(message);
-    err.status = status;
-    err.details = details;
-    return err;
-}
+const {
+    applySavingPlanState,
+    buildHttpError,
+    loadSavingPlanForUpdate,
+    publishSavingPlanCompleted,
+} = require("../services/savingPlanState.service");
 
 function sendError(res, err) {
     if (err.status) {
@@ -78,65 +75,20 @@ exports.updateProgress = async (req, res) => {
         let notifyPayload = null;
 
         await SavingPlan.transaction(async (trx) => {
-            const plan = await SavingPlan.query(trx).findById(id).forUpdate();
-            if (!plan) {
-                throw buildHttpError(404, "Không tìm thấy kế hoạch");
-            }
-
-            const progressPercentage =
-                plan.target_amount > 0
-                    ? Math.min((current_amount / plan.target_amount) * 100, 100)
-                    : 0;
-            const isNowCompleted = current_amount >= plan.target_amount;
-
-            if (!plan.completed && isNowCompleted) {
-                const transactionPayload = {
-                    user_id: plan.user_id,
-                    category: "Thực hiện kế hoạch tiết kiệm",
-                    type: "expense",
-                    amount: Number(plan.target_amount),
-                    date: new Date().toISOString().slice(0, 10),
-                    note: `Hoàn thành kế hoạch tiết kiệm: ${plan.title}`,
-                };
-
-                try {
-                    await transactionClient.post(
-                        "/api/transactions",
-                        transactionPayload
-                    );
-                } catch (err) {
-                    console.error("[TRANSACTION SERVICE ERROR]", {
-                        message: err.message,
-                        status: err.response?.status,
-                        data: err.response?.data,
-                    });
-                    throw buildHttpError(
-                        500,
-                        "Cập nhật tiến độ nhưng tạo transaction thất bại",
-                        err.message
-                    );
-                }
-            }
-
-            updated = await SavingPlan.query(trx).patchAndFetchById(id, {
-                current_amount,
-                progress_percentage: Number(progressPercentage.toFixed(2)),
-                completed: isNowCompleted,
+            const plan = await loadSavingPlanForUpdate(trx, id);
+            const result = await applySavingPlanState({
+                trx,
+                plan,
+                nextCurrentAmount: current_amount,
+                completionErrorMessage:
+                    "Cập nhật tiến độ nhưng tạo transaction thất bại",
             });
 
-            if (isNowCompleted) {
-                notifyPayload = {
-                    userId: plan.user_id,
-                    title: plan.title,
-                };
-            }
+            updated = result.updated;
+            notifyPayload = result.notificationPayload;
         });
 
-        if (notifyPayload) {
-            notifyClient.publish("SAVING_PLAN_COMPLETED", notifyPayload.userId, {
-                title: notifyPayload.title,
-            });
-        }
+        publishSavingPlanCompleted(notifyPayload);
 
         res.json({
             message: "Cập nhật tiến độ thành công",
@@ -155,58 +107,25 @@ exports.markCompleted = async (req, res) => {
         let notifyPayload = null;
 
         await SavingPlan.transaction(async (trx) => {
-            const plan = await SavingPlan.query(trx).findById(id).forUpdate();
-
-            if (!plan) {
-                throw buildHttpError(404, "Không tìm thấy kế hoạch");
-            }
+            const plan = await loadSavingPlanForUpdate(trx, id);
 
             if (plan.completed) {
                 throw buildHttpError(400, "Kế hoạch đã hoàn thành trước đó");
             }
 
-            const transactionPayload = {
-                user_id: plan.user_id,
-                category: "Thực hiện kế hoạch tiết kiệm",
-                type: "expense",
-                amount: Number(plan.target_amount),
-                date: new Date().toISOString().slice(0, 10),
-                note: `Hoàn thành kế hoạch tiết kiệm: ${plan.title}`,
-            };
-
-            try {
-                await transactionClient.post(
-                    "/api/transactions",
-                    transactionPayload
-                );
-            } catch (err) {
-                console.error("[TRANSACTION SERVICE ERROR]", {
-                    message: err.message,
-                    status: err.response?.status,
-                    data: err.response?.data,
-                });
-                throw buildHttpError(
-                    500,
+            const result = await applySavingPlanState({
+                trx,
+                plan,
+                nextCurrentAmount: plan.target_amount,
+                completionErrorMessage:
                     "Hoàn thành kế hoạch nhưng tạo transaction thất bại",
-                    err.message
-                );
-            }
-
-            updated = await SavingPlan.query(trx).patchAndFetchById(id, {
-                completed: true,
-                current_amount: Number(plan.target_amount),
-                progress_percentage: 100,
             });
 
-            notifyPayload = {
-                userId: plan.user_id,
-                title: plan.title,
-            };
+            updated = result.updated;
+            notifyPayload = result.notificationPayload;
         });
 
-        notifyClient.publish("SAVING_PLAN_COMPLETED", notifyPayload.userId, {
-            title: notifyPayload.title,
-        });
+        publishSavingPlanCompleted(notifyPayload);
 
         return res.json({
             message: "Đã đánh dấu hoàn thành kế hoạch",
