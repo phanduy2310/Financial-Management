@@ -1,25 +1,53 @@
 const service = require("../services/transaction");
 const { success, error } = require("../utils/response");
-
+const notification = require("../clients/notification")
 // ==============================
 // CREATE TRANSACTION
 // ==============================
 exports.create = async (req, res) => {
     try {
         const required = ["type", "category", "amount", "date"];
+
         for (const field of required) {
             if (!req.body[field]) {
-                return error(res, `Missing required field: ${field}`, 400, "MISSING_REQUIRED_FIELD");
+                return error(
+                    res,
+                    `Missing required field: ${field}`,
+                    400,
+                    "MISSING_REQUIRED_FIELD"
+                );
             }
         }
 
+        const userId = req.user.id;
         const { type, category, amount, date, note } = req.body;
-        const result = await service.create({ user_id: req.user.id, type, category, amount, date, note });
 
-        success(res, result, "Tạo giao dịch thành công", 201);
+        const result = await service.create({
+            user_id: userId,
+            type,
+            category,
+            amount,
+            date,
+            note
+        });
+
+        notification.publish("TRANSACTION_CREATED", userId, {
+            transaction_id: result.id,
+            type,
+            category,
+            amount: Number(amount),
+            date
+        });
+
+        return success(res, result, "Tạo giao dịch thành công", 201);
     } catch (err) {
-        console.error("CREATE TRANSACTION ERROR", err);
-        error(res, "Không thể tạo giao dịch", 500, "CREATE_TRANSACTION_ERROR");
+        console.error("[CREATE TRANSACTION ERROR]", err);
+        return error(
+            res,
+            "Không thể tạo giao dịch",
+            500,
+            "CREATE_TRANSACTION_ERROR"
+        );
     }
 };
 
