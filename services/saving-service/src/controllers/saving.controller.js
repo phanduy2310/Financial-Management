@@ -1,10 +1,12 @@
 const SavingPlan = require("../models/saving.model");
 const {
-    applySavingPlanState,
-    buildHttpError,
-    loadSavingPlanForUpdate,
-    publishSavingPlanCompleted,
-} = require("../services/savingPlanState.service");
+    createSavingPlan,
+    deleteSavingPlan,
+    markSavingPlanCompleted,
+    updateSavingPlanInfo,
+    updateSavingPlanProgress,
+} = require("../application/saving/savingPlan.application");
+const { createDomainError } = require("../domain/common/domainError");
 const {
     validateSavingCreateInput,
     validateSavingProgressInput,
@@ -25,18 +27,8 @@ function sendError(res, err) {
 
 exports.create = async (req, res) => {
     try {
-        const { user_id, title, target_amount, start_date, end_date } =
-            validateSavingCreateInput(req.body);
-
-        const plan = await SavingPlan.query().insert({
-            user_id,
-            title,
-            target_amount,
-            current_amount: 0,
-            start_date,
-            end_date,
-            completed: false,
-        });
+        const input = validateSavingCreateInput(req.body);
+        const plan = await createSavingPlan(input);
 
         res.status(201).json({ message: "Tạo kế hoạch thành công", plan });
     } catch (err) {
@@ -69,25 +61,7 @@ exports.updateProgress = async (req, res) => {
     try {
         const { id } = req.params;
         const { current_amount } = validateSavingProgressInput(req.body);
-
-        let updated;
-        let notifyPayload = null;
-
-        await SavingPlan.transaction(async (trx) => {
-            const plan = await loadSavingPlanForUpdate(trx, id);
-            const result = await applySavingPlanState({
-                trx,
-                plan,
-                nextCurrentAmount: current_amount,
-                completionErrorMessage:
-                    "Cập nhật tiến độ nhưng tạo transaction thất bại",
-            });
-
-            updated = result.updated;
-            notifyPayload = result.notificationPayload;
-        });
-
-        publishSavingPlanCompleted(notifyPayload);
+        const updated = await updateSavingPlanProgress({ id, current_amount });
 
         res.json({
             message: "Cập nhật tiến độ thành công",
@@ -101,30 +75,7 @@ exports.updateProgress = async (req, res) => {
 exports.markCompleted = async (req, res) => {
     try {
         const { id } = req.params;
-
-        let updated;
-        let notifyPayload = null;
-
-        await SavingPlan.transaction(async (trx) => {
-            const plan = await loadSavingPlanForUpdate(trx, id);
-
-            if (plan.completed) {
-                throw buildHttpError(400, "Kế hoạch đã hoàn thành trước đó");
-            }
-
-            const result = await applySavingPlanState({
-                trx,
-                plan,
-                nextCurrentAmount: plan.target_amount,
-                completionErrorMessage:
-                    "Hoàn thành kế hoạch nhưng tạo transaction thất bại",
-            });
-
-            updated = result.updated;
-            notifyPayload = result.notificationPayload;
-        });
-
-        publishSavingPlanCompleted(notifyPayload);
+        const updated = await markSavingPlanCompleted({ id });
 
         return res.json({
             message: "Đã đánh dấu hoàn thành kế hoạch",
@@ -138,31 +89,14 @@ exports.markCompleted = async (req, res) => {
 exports.updateInfo = async (req, res) => {
     try {
         const { id } = req.params;
-        let updated;
-        let notifyPayload = null;
+        const currentPlan = await SavingPlan.query().findById(id);
 
-        await SavingPlan.transaction(async (trx) => {
-            const plan = await loadSavingPlanForUpdate(trx, id);
-            const fields = validateSavingUpdateInput(req.body, plan);
-            const nextPlan = {
-                ...plan,
-                ...fields,
-            };
+        if (!currentPlan) {
+            throw createDomainError(404, "Không tìm thấy kế hoạch");
+        }
 
-            const result = await applySavingPlanState({
-                trx,
-                plan: nextPlan,
-                nextCurrentAmount: plan.current_amount,
-                completionErrorMessage:
-                    "Cap nhat thong tin ke hoach nhung tao transaction that bai",
-                additionalPatch: fields,
-            });
-
-            updated = result.updated;
-            notifyPayload = result.notificationPayload;
-        });
-
-        publishSavingPlanCompleted(notifyPayload);
+        const fields = validateSavingUpdateInput(req.body, currentPlan);
+        const updated = await updateSavingPlanInfo({ id, fields });
 
         res.json({
             message: "Cập nhật thông tin kế hoạch thành công",
@@ -176,15 +110,11 @@ exports.updateInfo = async (req, res) => {
 exports.delete = async (req, res) => {
     try {
         const { id } = req.params;
-        const deleted = await SavingPlan.query().deleteById(id);
-        if (!deleted) {
-            return res
-                .status(404)
-                .json({ message: "Không tìm thấy kế hoạch để xóa" });
-        }
+        await deleteSavingPlan({ id });
+
         res.json({ message: "Đã xóa kế hoạch thành công" });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        return sendError(res, err);
     }
 };
 
@@ -243,7 +173,10 @@ exports.getProgressHistory = async (req, res) => {
         const { id } = req.params;
         const SavingInstallment = require("../models/savingInstallment.model");
         const plan = await SavingPlan.query().findById(id);
-        if (!plan) return res.status(404).json({ message: "Không tìm thấy kế hoạch" });
+
+        if (!plan) {
+            return res.status(404).json({ message: "Không tìm thấy kế hoạch" });
+        }
 
         const installments = await SavingInstallment.query()
             .where("saving_plan_id", id)
@@ -252,9 +185,11 @@ exports.getProgressHistory = async (req, res) => {
         let cumulative = 0;
         const history = installments.map((inst) => {
             cumulative += Number(inst.amount);
-            const progress = plan.target_amount > 0
-                ? Math.min((cumulative / plan.target_amount) * 100, 100)
-                : 0;
+            const progress =
+                plan.target_amount > 0
+                    ? Math.min((cumulative / plan.target_amount) * 100, 100)
+                    : 0;
+
             return {
                 date: new Date(inst.payment_date).toISOString().slice(0, 10),
                 progress: Number(progress.toFixed(2)),
