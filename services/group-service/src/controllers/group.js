@@ -4,75 +4,94 @@ const { success, error } = require("../utils/response");
 
 exports.createGroup = async (req, res) => {
     try {
-        const { name, description, owner_id } = req.body;
+        const { name, description } = req.body;
+        const owner_id = req.user.id;
 
-        if (!name || !owner_id) {
-            return error(res, "Thiếu name hoặc owner_id", 400);
+        if (!name) {
+            return error(res, "Thiếu tên nhóm", 400, "MISSING_NAME");
         }
 
-        const group = await groups.create({ name, description, owner_id });
+        const group = await groups.createGroupWithOwner({
+            name,
+            description,
+            owner_id
+        });
 
-        // Owner là thành viên đầu tiên
-        await members.addMember(group.id, owner_id, "owner");
-
-        success(res, group, "Tạo nhóm thành công");
+        return success(res, group, "Tạo nhóm thành công", 201);
     } catch (err) {
-        error(res, err.message);
+        console.error("[CREATE GROUP ERROR]", err);
+        return error(res, "Không thể tạo nhóm", 500, "CREATE_GROUP_ERROR");
     }
 };
 
 exports.updateGroup = async (req, res) => {
     try {
+        const groupId = req.params.id;
+        const userId = req.user.id;
         const { name, description } = req.body;
+
         const fields = {};
         if (name !== undefined) fields.name = name;
         if (description !== undefined) fields.description = description;
 
         if (Object.keys(fields).length === 0) {
-            return error(res, "Không có thông tin cần cập nhật", 400);
+            return error(res, "Không có thông tin cần cập nhật", 400, "EMPTY_UPDATE_FIELDS");
         }
 
-        const updated = await groups.update(req.params.id, fields);
-        if (!updated) return error(res, "Không tìm thấy nhóm", 404);
+        const existing = await groups.getById(groupId);
+        if (!existing) {
+            return error(res, "Không tìm thấy nhóm", 404, "GROUP_NOT_FOUND");
+        }
 
-        success(res, null, "Cập nhật nhóm thành công");
+        if (existing.owner_id !== userId) {
+            return error(res, "Không có quyền cập nhật nhóm này", 403, "FORBIDDEN");
+        }
+
+        const updated = await groups.update(groupId, fields);
+
+        return success(res, updated, "Cập nhật nhóm thành công");
     } catch (err) {
-        error(res, err.message);
+        console.error("[UPDATE GROUP ERROR]", err);
+        return error(res, "Không thể cập nhật nhóm", 500, "UPDATE_GROUP_ERROR");
     }
 };
 
 exports.deleteGroup = async (req, res) => {
     try {
-        await groups.delete(req.params.id);
-        success(res, null, "Xóa nhóm thành công");
+        const groupId = req.params.id;
+        const userId = req.user.id;
+
+        const existing = await groups.getById(groupId);
+        if (!existing) {
+            return error(res, "Không tìm thấy nhóm", 404, "GROUP_NOT_FOUND");
+        }
+
+        if (existing.owner_id !== userId) {
+            return error(res, "Không có quyền xóa nhóm này", 403, "FORBIDDEN");
+        }
+
+        await groups.delete(groupId);
+
+        return success(res, null, "Xóa nhóm thành công");
     } catch (err) {
-        error(res, err.message);
+        console.error("[DELETE GROUP ERROR]", err);
+        return error(res, "Không thể xóa nhóm", 500, "DELETE_GROUP_ERROR");
     }
 };
 
-exports.getGroupsOfUser = async (req, res) => {
+exports.getMyGroups = async (req, res) => {
     try {
-        const data = await groups.getGroupsOfUser(req.params.user_id);
+        const userId = req.user.id;
+        const data = await groups.getGroupsOfUser(userId);
 
-        // Enrich owner_name
-        const ownerIds = [...new Set(data.map((g) => g.owner_id).filter(Boolean))];
-        let userMap = {};
-        if (ownerIds.length > 0) {
-            try {
-                userMap = Object.fromEntries(ownerIds.map((u) => [u.id, u]));
-            } catch (e) {
-                console.error("[GROUP] Failed to fetch owner names:", e.message);
-            }
-        }
-
-        const enriched = data.map((g) => ({
+        const normalized = data.map((g) => ({
             ...g,
-            member_count: Number(g.member_count) || 0,
-            owner_name: userMap[g.owner_id]?.fullname || null,
+            member_count: Number(g.member_count) || 0
         }));
 
-        success(res, enriched);
+        return success(res, normalized, "Lấy danh sách nhóm thành công");
     } catch (err) {
-        error(res, err.message);
+        console.error("[GET MY GROUPS ERROR]", err);
+        return error(res, "Không thể lấy danh sách nhóm", 500, "GET_GROUPS_ERROR");
     }
 };

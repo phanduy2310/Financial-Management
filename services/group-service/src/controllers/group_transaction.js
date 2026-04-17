@@ -9,7 +9,7 @@ exports.createTransaction = async (req, res) => {
 
         if (!group_id || !user_id || !type || !category || !amount) {
             return error(res, "Thiếu thông tin bắt buộc", 400);
-        }
+        } 
 
         // 1. Lưu giao dịch nhóm
         const trx = await trans.create({
