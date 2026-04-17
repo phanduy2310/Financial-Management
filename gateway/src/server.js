@@ -23,6 +23,10 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(morgan("dev"));
 
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+
 // Proxy routes
 app.use("/api/auth", authProxy);
 app.use("/api/parent", authProxy);

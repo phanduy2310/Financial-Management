@@ -1,0 +1,41 @@
+services:
+  notification-service:
+    build: .
+    restart: always
+    env_file:
+      - .env.dev
+    ports:
+      - "8084:8084"
+    command: sh -c "npx knex migrate:latest && node server.js"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8084/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - notif-network
+
+  mysql:
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: financial_notification
+      MYSQL_USER: finance_user
+      MYSQL_PASSWORD: finance_pass
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - notif-network
+
+networks:
+  notif-network:
+    driver: bridge

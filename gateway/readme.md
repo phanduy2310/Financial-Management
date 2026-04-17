@@ -1,44 +1,80 @@
-# API Gateway
+# API Gateway — PTIT-Financial
 
-## Overview
-
-The API Gateway serves as the single entry point for all client requests. It routes incoming requests to the appropriate backend microservice.
-
-## Responsibilities
-
-- **Request routing**: Forward requests to the correct service
-- **Load balancing**: Distribute traffic (if applicable)
-- **Authentication**: Validate tokens/credentials (optional)
-- **Rate limiting**: Protect services from overload (optional)
-- **CORS handling**: Allow frontend cross-origin requests
-- **Request/Response transformation**: Modify headers, paths as needed
+Cổng duy nhất cho toàn bộ hệ thống. Nhận request từ frontend, xử lý CORS và route đến đúng microservice.
 
 ## Tech Stack
 
-| Component  | Choice             |
-|------------|--------------------|
-| Approach   | *(e.g., Nginx, Express, FastAPI, Kong, Traefik)* |
+| Component | Choice     |
+| --------- | ---------- |
+| Language  | Node.js    |
+| Framework | Express.js |
+| Proxy     | axios      |
+| Logger    | morgan     |
+
+## Port
+
+- `5444` (host & container)
 
 ## Routing Table
 
-| External Path        | Target Service | Internal URL                   |
-|----------------------|----------------|--------------------------------|
-| `/api/service-a/*`   | Service A      | `http://service-a:5000/*`      |
-| `/api/service-b/*`   | Service B      | `http://service-b:5000/*`      |
+| External Path               | Target Service            |
+| --------------------------- | ------------------------- |
+| `/api/auth/*`               | auth-service:8081         |
+| `/api/parent/*`             | auth-service:8081         |
+| `/api/transactions/*`       | transaction-service:8082  |
+| `/api/budget/*`             | transaction-service:8082  |
+| `/api/saving/*`             | saving-service:8083       |
+| `/api/installment/*`        | saving-service:8083       |
+| `/api/notification/*`       | notification-service:8084 |
+| `/api/groups/*`             | group-service:8085        |
+| `/api/group-members/*`      | group-service:8085        |
+| `/api/group-transactions/*` | group-service:8085        |
+
+## CORS
+
+Chỉ cho phép request từ `FRONTEND_URL` (mặc định `http://localhost:5000`) với `credentials: true`.
 
 ## Running
 
 ```bash
-# From project root
-docker compose up gateway --build
+# Chạy toàn bộ hệ thống
+docker compose up --build
+
+# Chỉ build lại gateway
+docker compose build gateway
+docker compose up -d gateway
 ```
 
-## Configuration
+## Health Check
 
-The gateway uses Docker Compose networking. Services are accessible by their
-service names defined in `docker-compose.yml` (e.g., `service-a`, `service-b`).
+```
+GET /health → {"status": "ok"}
+```
 
-## Notes
+## Environment Variables
 
-- Use service names (not `localhost`) for upstream URLs inside Docker
-- The gateway exposes port 8080 to the host
+| Variable                   | Description              | Example                            |
+| -------------------------- | ------------------------ | ---------------------------------- |
+| `PORT`                     | Port gateway lắng nghe   | `5444`                             |
+| `FRONTEND_URL`             | Origin được phép CORS    | `http://localhost:5000`            |
+| `AUTH_SERVICE_URL`         | URL auth-service         | `http://auth-service:8081`         |
+| `TRANSACTION_SERVICE_URL`  | URL transaction-service  | `http://transaction-service:8082`  |
+| `SAVING_SERVICE_URL`       | URL saving-service       | `http://saving-service:8083`       |
+| `NOTIFICATION_SERVICE_URL` | URL notification-service | `http://notification-service:8084` |
+| `GROUP_SERVICE_URL`        | URL group-service        | `http://group-service:8085`        |
+
+## Project Structure
+
+```
+gateway/
+├── Dockerfile
+└── src/
+    ├── .env
+    ├── server.js
+    └── routes/
+        ├── auth.proxy.js
+        ├── transaction.proxy.js
+        ├── saving.proxy.js
+        ├── notification.proxy.js
+        └── group.proxy.js
+```
