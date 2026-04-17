@@ -35,6 +35,53 @@ function calculateActualPaymentAmount(plan) {
     return Math.min(Number(plan.monthly_payment), remainingAmount);
 }
 
+function computeInstallmentDerivedFields({
+    totalAmount,
+    paidAmount,
+    totalTerms,
+    currentTerm,
+}) {
+    const progressPercentage =
+        totalAmount > 0
+            ? Math.min((paidAmount / totalAmount) * 100, 100)
+            : 0;
+    const completed = paidAmount >= totalAmount || currentTerm >= totalTerms;
+
+    return {
+        progress_percentage: Number(progressPercentage.toFixed(2)),
+        completed,
+    };
+}
+
+function assertInstallmentPlanStateIsValid({
+    totalAmount,
+    paidAmount,
+    totalTerms,
+    currentTerm,
+}) {
+    if (!Number.isFinite(paidAmount) || paidAmount < 0) {
+        throw buildHttpError(400, "paid_amount hien tai khong hop le");
+    }
+
+    if (!Number.isInteger(currentTerm) || currentTerm < 0) {
+        throw buildHttpError(400, "current_term hien tai khong hop le");
+    }
+
+    if (paidAmount > totalAmount) {
+        throw buildHttpError(
+            400,
+            "total_amount khong the nho hon paid_amount hien tai"
+        );
+    }
+
+    if (currentTerm > totalTerms) {
+        throw buildHttpError(
+            400,
+            "total_terms khong the nho hon current_term hien tai"
+        );
+    }
+}
+
 // 🆕 1. Tạo kế hoạch trả góp
 exports.create = async (req, res) => {
     try {
@@ -265,15 +312,48 @@ exports.getStats = async (req, res) => {
 exports.updateInfo = async (req, res) => {
     try {
         const { id } = req.params;
-        const plan = await InstallmentPlan.query().findById(id);
-        if (!plan)
-            return res
-                .status(404)
-                .json({ message: "Không tìm thấy khoản trả góp" });
+        let updated;
 
-        const fields = validateInstallmentUpdateInput(req.body, plan);
+        await InstallmentPlan.transaction(async (trx) => {
+            const plan = await InstallmentPlan.query(trx).findById(id).forUpdate();
+            if (!plan) {
+                throw buildHttpError(404, "Không tìm thấy khoản trả góp");
+            }
 
-        const updated = await plan.$query().patchAndFetch(fields);
+            const fields = validateInstallmentUpdateInput(req.body, plan);
+            const nextTotalAmount = Number(
+                fields.total_amount !== undefined
+                    ? fields.total_amount
+                    : plan.total_amount
+            );
+            const nextTotalTerms = Number(
+                fields.total_terms !== undefined
+                    ? fields.total_terms
+                    : plan.total_terms
+            );
+            const paidAmount = Number(plan.paid_amount);
+            const currentTerm = Number(plan.current_term);
+
+            assertInstallmentPlanStateIsValid({
+                totalAmount: nextTotalAmount,
+                paidAmount,
+                totalTerms: nextTotalTerms,
+                currentTerm,
+            });
+
+            const derivedFields = computeInstallmentDerivedFields({
+                totalAmount: nextTotalAmount,
+                paidAmount,
+                totalTerms: nextTotalTerms,
+                currentTerm,
+            });
+
+            updated = await InstallmentPlan.query(trx).patchAndFetchById(id, {
+                ...fields,
+                ...derivedFields,
+            });
+        });
+
         res.json({ message: "Cập nhật thông tin thành công", plan: updated });
     } catch (err) {
         return sendError(res, err);

@@ -138,13 +138,32 @@ exports.markCompleted = async (req, res) => {
 exports.updateInfo = async (req, res) => {
     try {
         const { id } = req.params;
-        const plan = await SavingPlan.query().findById(id);
-        if (!plan) {
-            return res.status(404).json({ message: "Không tìm thấy kế hoạch" });
-        }
+        let updated;
+        let notifyPayload = null;
 
-        const fields = validateSavingUpdateInput(req.body, plan);
-        const updated = await SavingPlan.query().findById(id).patchAndFetch(fields);
+        await SavingPlan.transaction(async (trx) => {
+            const plan = await loadSavingPlanForUpdate(trx, id);
+            const fields = validateSavingUpdateInput(req.body, plan);
+            const nextPlan = {
+                ...plan,
+                ...fields,
+            };
+
+            const result = await applySavingPlanState({
+                trx,
+                plan: nextPlan,
+                nextCurrentAmount: plan.current_amount,
+                completionErrorMessage:
+                    "Cap nhat thong tin ke hoach nhung tao transaction that bai",
+                additionalPatch: fields,
+            });
+
+            updated = result.updated;
+            notifyPayload = result.notificationPayload;
+        });
+
+        publishSavingPlanCompleted(notifyPayload);
+
         res.json({
             message: "Cập nhật thông tin kế hoạch thành công",
             plan: updated,

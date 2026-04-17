@@ -35,9 +35,19 @@ async function applySavingPlanState({
     plan,
     nextCurrentAmount,
     completionErrorMessage,
+    additionalPatch = {},
 }) {
     const currentAmount = Number(nextCurrentAmount);
     const targetAmount = Number(plan.target_amount);
+
+    if (!Number.isFinite(currentAmount) || currentAmount < 0) {
+        throw buildHttpError(400, "current_amount phai la so khong am");
+    }
+
+    if (!Number.isFinite(targetAmount) || targetAmount <= 0) {
+        throw buildHttpError(400, "target_amount phai la so duong");
+    }
+
     const progressPercentage =
         targetAmount > 0
             ? Math.min((currentAmount / targetAmount) * 100, 100)
@@ -62,6 +72,7 @@ async function applySavingPlanState({
     }
 
     const updated = await SavingPlan.query(trx).patchAndFetchById(plan.id, {
+        ...additionalPatch,
         current_amount: currentAmount,
         progress_percentage: Number(progressPercentage.toFixed(2)),
         completed: isNowCompleted,
