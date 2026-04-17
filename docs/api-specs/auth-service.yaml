@@ -1,0 +1,299 @@
+openapi: 3.0.3
+info:
+  title: Auth Service API
+  description: |
+    Identity Context — đăng ký, đăng nhập, quản lý người dùng, liên kết phụ huynh-con, JWT refresh.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:5444
+    description: Qua API Gateway (development)
+
+paths:
+  /health:
+    get:
+      summary: Health check (gateway)
+      operationId: gatewayHealth
+      responses:
+        '200':
+          description: Gateway is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/auth/register:
+    post:
+      summary: Đăng ký tài khoản mới
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Đăng ký thành công — trả về {success, message, data: user}
+        '400':
+          description: Dữ liệu không hợp lệ hoặc email đã tồn tại
+
+  /api/auth/login:
+    post:
+      summary: Đăng nhập
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Đăng nhập thành công — trả về {success, message, data:{user, accessToken}}; refresh token set vào httpOnly cookie
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '404':
+          description: Không tìm thấy người dùng
+        '401':
+          description: Sai mật khẩu
+
+  /api/auth/refresh:
+    post:
+      summary: Làm mới access token
+      operationId: refreshToken
+      description: Đọc refresh token từ httpOnly cookie, trả về access token mới
+      responses:
+        '200':
+          description: Access token mới
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Refresh token không hợp lệ hoặc hết hạn
+
+  /api/auth/logout:
+    post:
+      summary: Đăng xuất
+      operationId: logout
+      responses:
+        '200':
+          description: Đã xoá refresh token cookie
+
+  /api/auth/me:
+    get:
+      summary: Lấy thông tin người dùng hiện tại
+      operationId: getMe
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Thông tin user — trả về {success, data:{id, fullname, email, role, created_at}}
+        '401':
+          description: Chưa xác thực
+
+  /api/auth/users/find:
+    get:
+      summary: Tìm user theo email
+      operationId: findByEmail
+      parameters:
+        - name: email
+          in: query
+          required: true
+          schema:
+            type: string
+            format: email
+      responses:
+        '200':
+          description: Thông tin user — trả về {success, data:{...}}
+        '404':
+          description: Không tìm thấy
+
+  /api/auth/users/bulk:
+    post:
+      summary: Lấy thông tin nhiều user theo danh sách ID (internal)
+      operationId: getUsersBulk
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: integer
+      responses:
+        '200':
+          description: Trả về {success, count, users:[...]}
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  count:
+                    type: integer
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserResponse'
+
+  /api/auth/users/{id}:
+    get:
+      summary: Lấy thông tin user theo ID
+      operationId: getUserById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Thông tin user — trả về {success, data:{...}}
+        '404':
+          description: Không tìm thấy
+
+  /api/parent/children:
+    post:
+      summary: Thêm con theo email (dành cho phụ huynh)
+      operationId: addChild
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [child_email]
+              properties:
+                child_email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Đã gửi yêu cầu liên kết
+        '404':
+          description: Không tìm thấy tài khoản
+    get:
+      summary: Lấy danh sách con (dành cho phụ huynh)
+      operationId: getChildren
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Danh sách tài khoản con — trả về {data:[...]}
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserResponse'
+
+  /api/parent/confirm:
+    post:
+      summary: Con xác nhận liên kết phụ huynh
+      operationId: confirmLink
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, action]
+              properties:
+                token:
+                  type: string
+                action:
+                  type: string
+                  enum: [accepted, rejected]
+      responses:
+        '200':
+          description: Xử lý liên kết thành công
+        '400':
+          description: Token không hợp lệ / hết hạn / action sai
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+
+    RegisterRequest:
+      type: object
+      required: [email, password, fullname]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
+        fullname:
+          type: string
+        role:
+          type: string
+          enum: [user, admin, parent]
+          default: user
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    AuthResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+        data:
+          type: object
+          properties:
+            accessToken:
+              type: string
+            user:
+              $ref: '#/components/schemas/UserResponse'
+
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        fullname:
+          type: string
+        role:
+          type: string
+          enum: [user, admin, parent]
+        created_at:
+          type: string
+          format: date-time

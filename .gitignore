@@ -110,3 +110,9 @@ coverage/
 .pytest_cache/
 htmlcov/
 test-results/
+
+# ==============================
+# Ignored Services
+# ==============================
+services/category-service/
+service/transaction-service/scripts

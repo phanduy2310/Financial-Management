@@ -1,217 +1,131 @@
-# 🧩 Microservices Assignment Starter Template
+# PTIT-Financial
 
-This repository is a **starter template** for building a microservices-based system. Use it as a base for your group assignment.
+> Hệ thống quản lý tài chính cá nhân theo kiến trúc microservices — theo dõi thu chi, kế hoạch tiết kiệm, trả góp, nhóm chi tiêu và thông báo real-time.
 
-> **Technology-agnostic**: You are free to choose any programming language, framework, or database for each service.
+**Repository**: https://github.com/jnp2018/mid-project-156180347
 
 ---
 
-## 👥 Team Members
+## Thành viên nhóm
 
 | Name | Student ID | Role | Contribution |
-|------|------------|------|-------------|
-| ...  | ...        | ...  | ...         |
+|------|------------|------|--------------|
+| Phan Văn Duy | B22DCCN156 | Student | Transaction Service, Group Service |
+| Bùi Văn Đạt | B22DCCN180 | Student | Auth Service, Saving Service |
+| Trần Đức Hoàng | B22DCCN347 | Student | API Gateway, Notification Service |
 
 ---
 
-## 📁 Project Structure
+## Business Process
 
-```
-microservices-assignment-starter/
-├── README.md                       # This file — project overview
-├── .env.example                    # Environment variable template
-├── docker-compose.yml              # Multi-container orchestration
-├── Makefile                        # Common development commands
-│
-├── docs/                           # 📖 Documentation
-│   ├── analysis-and-design.md      # System analysis & service design
-│   ├── architecture.md             # Architecture overview & diagrams
-│   ├── asset/                      # Images, diagrams, visual assets
-│   └── api-specs/                  # OpenAPI 3.0 specifications
-│       ├── service-a.yaml
-│       └── service-b.yaml
-│
-├── frontend/                       # 🖥️ Frontend application
-│   ├── Dockerfile
-│   ├── readme.md
-│   └── src/
-│
-├── gateway/                        # 🚪 API Gateway / reverse proxy
-│   ├── Dockerfile
-│   ├── readme.md
-│   └── src/
-│
-├── services/                       # ⚙️ Backend microservices
-│   ├── service-a/
-│   │   ├── Dockerfile
-│   │   ├── readme.md
-│   │   └── src/
-│   └── service-b/
-│       ├── Dockerfile
-│       ├── readme.md
-│       └── src/
-│
-├── scripts/                        # 🔧 Utility scripts
-│   └── init.sh
-│
-├── .ai/                            # 🤖 AI-assisted development
-│   ├── AGENTS.md                   # Agent instructions (source of truth)
-│   ├── vibe-coding-guide.md        # Hướng dẫn vibe coding
-│   └── prompts/                    # Reusable prompt templates
-│       ├── new-service.md
-│       ├── api-endpoint.md
-│       ├── create-dockerfile.md
-│       ├── testing.md
-│       └── debugging.md
-│
-├── .github/copilot-instructions.md # GitHub Copilot instructions
-├── .cursorrules                    # Cursor AI instructions
-├── .windsurfrules                  # Windsurf AI instructions
-└── CLAUDE.md                       # Claude Code instructions
-```
+PTIT-Financial hỗ trợ người dùng quản lý tài chính cá nhân theo quy trình:
+
+1. **Đăng ký / Đăng nhập** — xác thực danh tính, liên kết phụ huynh giám sát
+2. **Ghi giao dịch** — theo dõi thu nhập và chi tiêu theo danh mục
+3. **Ngân sách** — đặt giới hạn chi tiêu theo danh mục mỗi tháng
+4. **Kế hoạch tiết kiệm** — đặt mục tiêu tích lũy với theo dõi tiến độ
+5. **Trả góp** — quản lý các khoản vay theo từng kỳ thanh toán
+6. **Nhóm chi tiêu** — chia sẻ hóa đơn với bạn bè / gia đình
+7. **Thông báo real-time** — nhận thông báo giao dịch, nhắc kế hoạch tiết kiệm, liên kết phụ huynh qua SSE
 
 ---
 
-## 🚀 Getting Started
-
-### Prerequisites
-
-- [Docker Desktop](https://docs.docker.com/get-docker/) (includes Docker Compose)
-- [Git](https://git-scm.com/)
-- An AI coding tool (recommended): [GitHub Copilot](https://github.com/features/copilot), [Cursor](https://cursor.sh), [Windsurf](https://codeium.com/windsurf), or [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
-
-### Quick Start
-
-```bash
-# 1. Clone this repository
-git clone https://github.com/hungdn1701/microservices-assignment-starter.git
-cd microservices-assignment-starter
-
-# 2. Initialize the project
-bash scripts/init.sh
-# Or manually:
-cp .env.example .env
-
-# 3. Build and run all services
-docker compose up --build
-
-# 4. Verify services are running
-curl http://localhost:8080   # Gateway
-curl http://localhost:5001   # Service A
-curl http://localhost:5002   # Service B
-curl http://localhost:3000   # Frontend
-```
-
-### Using Make (optional)
-
-```bash
-make help      # Show all available commands
-make init      # Initialize project
-make up        # Build and start all services
-make down      # Stop all services
-make logs      # View logs
-make clean     # Remove everything
-```
-
----
-
-## 🏗️ Architecture
+## Kiến trúc hệ thống
 
 ```mermaid
-graph LR
-    U[User] --> FE[Frontend :3000]
-    FE --> GW[API Gateway :8080]
-    GW --> SA[Service A :5001]
-    GW --> SB[Service B :5002]
-    SA --> DB1[(Database A)]
-    SB --> DB2[(Database B)]
+graph TB
+    User["👤 User (Browser)"]
+
+    subgraph app-network [Docker Network: app-network]
+        FE["Frontend\nReact + nginx\nhost:5000"]
+        GW["API Gateway\nNode.js Express\nhost:5444"]
+
+        subgraph services [Backend Services — internal only]
+            AUTH["auth-service :8081"]
+            TRANS["transaction-service :8082"]
+            SAVING["saving-service :8083"]
+            NOTIFY["notification-service :8084"]
+            GROUP["group-service :8085"]
+        end
+
+        DB[("MySQL 8.0\nfinancial_auth\nfinancial_transaction\nfinancial_saving\nfinancial_notification\nfinancial_group")]
+    end
+
+    User -->|HTTP| FE
+    User -->|HTTP REST / SSE| GW
+    FE -->|API calls| GW
+
+    GW --> AUTH
+    GW --> TRANS
+    GW --> SAVING
+    GW --> NOTIFY
+    GW --> GROUP
+
+    AUTH --> DB
+    TRANS --> DB
+    SAVING --> DB
+    NOTIFY --> DB
+    GROUP --> DB
+
+    SAVING -->|"POST /api/transactions"| TRANS
+    GROUP -->|"POST /api/transactions"| TRANS
+    GROUP -->|"POST /api/auth/users/bulk"| AUTH
+    AUTH -->|"publish event"| NOTIFY
+    TRANS -->|"publish event"| NOTIFY
+    SAVING -->|"publish event"| NOTIFY
 ```
 
-- **Frontend** → User interface, communicates only with the Gateway
-- **Gateway** → Routes requests to appropriate backend services
-- **Services** → Independent microservices, each with their own database
-- **Communication** → REST APIs over Docker Compose network
-
-> 📖 Full architecture documentation: [`docs/architecture.md`](docs/architecture.md)
-
----
-
-## 🤖 AI-Assisted Development (Vibe Coding)
-
-This repo is pre-configured for **AI-powered development**. Each AI tool auto-loads its instruction file:
-
-| Tool | Config File |
-|------|-------------|
-| GitHub Copilot | `.github/copilot-instructions.md` |
-| Cursor | `.cursorrules` |
-| Claude Code | `CLAUDE.md` |
-| Windsurf | `.windsurfrules` |
-
-All instruction files point to [`.ai/AGENTS.md`](.ai/AGENTS.md) as the single source of truth.
-Ready-to-use prompt templates are in [`.ai/prompts/`](.ai/prompts/).
-
-> 📖 Full guide (Vietnamese): [`.ai/vibe-coding-guide.md`](.ai/vibe-coding-guide.md)
+| Component | Trách nhiệm | Tech Stack | Port |
+|-----------|-------------|------------|------|
+| **Frontend** | React SPA — giao diện người dùng | React 19, TailwindCSS, Recharts | 5000 |
+| **API Gateway** | Routing, CORS, proxy đến các service | Node.js, Express | 5444 |
+| **auth-service** | Đăng ký, đăng nhập, JWT, liên kết phụ huynh | Node.js, Express, Objection.js | 8081 |
+| **transaction-service** | Ghi nhận thu chi, quản lý ngân sách | Node.js, Express, Objection.js | 8082 |
+| **saving-service** | Kế hoạch tiết kiệm và trả góp | Node.js, Express, Objection.js | 8083 |
+| **notification-service** | Thông báo real-time qua SSE | Node.js, Express | 8084 |
+| **group-service** | Nhóm chi tiêu, chia bill | Node.js, Express, Objection.js | 8085 |
+| **MySQL** | Shared MySQL instance — mỗi service sở hữu một database riêng | MySQL 8.0 | 3306 |
 
 ---
 
-## 📋 Recommended Workflow
+## Khởi chạy
 
-### Phase 1: Analysis & Design
-- [ ] Read and understand this starter template
-- [ ] Choose your business domain and use case
-- [ ] Document analysis in [`docs/analysis-and-design.md`](docs/analysis-and-design.md)
-- [ ] Design system architecture in [`docs/architecture.md`](docs/architecture.md)
+### Yêu cầu
 
-### Phase 2: API Design
-- [ ] Define APIs using OpenAPI 3.0 in [`docs/api-specs/`](docs/api-specs/)
-- [ ] Include all endpoints, request/response schemas
-- [ ] Review API design with the team
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) đang chạy
 
-### Phase 3: Implementation
-- [ ] Choose tech stack for each service (can be different per service!)
-- [ ] Update Dockerfiles for each service
-- [ ] Implement `GET /health` endpoint in every service
-- [ ] Implement business logic and API endpoints
-- [ ] Configure API Gateway routing
-- [ ] Build frontend UI
+### Chạy toàn bộ hệ thống
 
-### Phase 4: Testing & Documentation
-- [ ] Write unit and integration tests
-- [ ] Verify `docker compose up --build` starts everything
-- [ ] Update service `readme.md` files
-- [ ] Update this `README.md` with your project details
+```bash
+docker compose up --build
+```
 
----
+Sau khi khởi động xong:
 
-## 🧪 Development Guidelines
+| URL | Mô tả |
+|-----|-------|
+| http://localhost:5000 | Giao diện người dùng |
+| http://localhost:5444/health | API Gateway health check |
 
-- **Health checks**: Every service MUST expose `GET /health` → `{"status": "ok"}`
-- **Environment**: Use `.env` for configuration, never hardcode secrets
-- **Networking**: Services communicate via Docker Compose DNS (use service names, not `localhost`)
-- **API specs**: Keep OpenAPI specs in sync with implementation
-- **Git workflow**: Use branches, write meaningful commit messages, commit often
+> Các backend service (auth, transaction, saving, notification, group) chỉ expose `GET /health` ở cấp container nội bộ — không accessible trực tiếp từ host. Kiểm tra trạng thái bằng `docker compose ps`.
+
+### Thứ tự khởi động
+
+1. `mysql` — chờ healthy (mysqladmin ping)
+2. Các backend service (8081–8085) — chạy song song, mỗi service tự migrate DB
+3. `gateway` — sau khi tất cả service healthy
+4. `frontend` — sau khi gateway sẵn sàng
 
 ---
 
-## 👩‍🏫 Assignment Submission Checklist
+## Tài liệu
 
-- [ ] `README.md` updated with team info, service descriptions, and usage instructions
-- [ ] All services start with `docker compose up --build`
-- [ ] Every service has a working `GET /health` endpoint
-- [ ] API documentation complete in `docs/api-specs/`
-- [ ] Architecture documented in `docs/architecture.md`
-- [ ] Analysis and design documented in `docs/analysis-and-design.md`
-- [ ] Each service has its own `readme.md`
-- [ ] Code is clean, organized, and follows chosen language conventions
-- [ ] Tests are included and passing
-
----
-
-## Author
-
-This template was created by **Hung Dang**.
-- Email: hungdn@ptit.edu.vn
-- GitHub: [hungdn1701](https://github.com/hungdn1701)
-
-Good luck! 💪🚀
-
+| Tài liệu | Mô tả |
+|----------|-------|
+| [`docs/analysis-and-design-ddd.md`](docs/analysis-and-design-ddd.md) | Phân tích & thiết kế theo DDD |
+| [`docs/architecture.md`](docs/architecture.md) | Kiến trúc, patterns, deployment |
+| [`docs/api-specs/auth-service.yaml`](docs/api-specs/auth-service.yaml) | OpenAPI — Auth Service |
+| [`docs/api-specs/transaction-service.yaml`](docs/api-specs/transaction-service.yaml) | OpenAPI — Transaction Service |
+| [`docs/api-specs/saving-service.yaml`](docs/api-specs/saving-service.yaml) | OpenAPI — Saving Service |
+| [`docs/api-specs/notification-service.yaml`](docs/api-specs/notification-service.yaml) | OpenAPI — Notification Service |
+| [`docs/api-specs/group-service.yaml`](docs/api-specs/group-service.yaml) | OpenAPI — Group Service |

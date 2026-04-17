@@ -1,88 +1,163 @@
-# 🏗️ System Architecture
+# System Architecture
 
-## 1. Overview
+> This document is completed **after** the Analysis and Design phase.
+> Analysis approach used: [Analysis and Design — DDD](analysis-and-design-ddd.md)
 
-Describe the purpose and high-level goals of your microservices system.
+**References:**
+1. *Service-Oriented Architecture: Analysis and Design for Services and Microservices* — Thomas Erl (2nd Edition)
+2. *Microservices Patterns: With Examples in Java* — Chris Richardson
+3. *Bài tập — Phát triển phần mềm hướng dịch vụ* — Hung Dang (available in Vietnamese)
 
-- What problem does it solve?
-- Who are the target users?
-- What are the key quality attributes (scalability, reliability, etc.)?
+---
 
-## 2. Architecture Style
+### How this document connects to Analysis & Design
 
-Describe the architectural patterns and styles used:
+```
+┌─────────────────────────────────────────────────────┐
+│         Analysis & Design — DDD                     │
+│                                                     │
+│  Part 1: Domain Discovery                           │
+│  Part 2: Strategic DDD →                            │
+│    5 Bounded Contexts:                              │
+│    Identity, Finance, Wealth, Collaboration,        │
+│    Messaging                                        │
+│  Part 3: Service Contracts (API endpoints)          │
+└────────────────┬────────────────────────────────────┘
+                 │ inputs: 5 service candidates, NFRs,
+                 │         service contracts (API specs)
+                 ▼
+┌─────────────────────────────────────────────────────┐
+│         Architecture (this document)                │
+│                                                     │
+│  1. Pattern Selection                               │
+│  2. System Components (tech stack, ports)           │
+│  3. Communication Matrix                            │
+│  4. Architecture Diagram                            │
+│  5. Deployment                                      │
+└─────────────────────────────────────────────────────┘
+```
 
-- [ ] Microservices
-- [ ] API Gateway pattern
-- [ ] Event-driven / Message queue
-- [ ] CQRS / Event Sourcing
-- [ ] Database per service
-- [ ] Saga pattern
-- [ ] Other: ___
+---
 
-## 3. System Components
+## 1. Pattern Selection
 
-| Component     | Responsibility                          | Tech Stack       | Port  |
-|---------------|----------------------------------------|------------------|-------|
-| **Frontend**  | User interface                         | *(your choice)*  | 3000  |
-| **Gateway**   | API routing, auth, rate limiting       | *(your choice)*  | 8080  |
-| **Service A** | *(describe domain)*                    | *(your choice)*  | 5001  |
-| **Service B** | *(describe domain)*                    | *(your choice)*  | 5002  |
-| **Database**  | *(persistent storage)*                 | *(your choice)*  | 5432  |
+| Pattern | Selected? | Business/Technical Justification |
+|---------|-----------|----------------------------------|
+| **API Gateway** | ✅ Yes | Tập trung routing, CORS, xác thực tại một điểm — frontend không gọi trực tiếp vào service |
+| **Database per Service** | ✅ Yes | Mỗi service sở hữu schema riêng trong MySQL — thay đổi schema của service này không ảnh hưởng service khác |
+| **Shared Database** | ⚠️ Partial | Dùng 1 MySQL instance nhưng mỗi service có database riêng (financial_auth, financial_transaction, v.v.) |
+| **Saga** | ❌ No | Không dùng distributed transaction; thay bằng rollback thủ công khi lỗi (compensating transaction) |
+| **Event-driven / Message Queue** | ⚠️ Partial | Fire-and-forget HTTP call thay vì message queue — đủ cho phạm vi bài tập |
+| **CQRS** | ❌ No | Không tách read/write — không cần thiết ở quy mô này |
+| **Circuit Breaker** | ❌ No | Chưa implement — service lỗi sẽ trả error về client |
+| **Service Registry / Discovery** | ❌ No | Dùng Docker Compose DNS thay thế (tên service = hostname) |
+| **SSE (Server-Sent Events)** | ✅ Yes | Real-time notification một chiều từ server đến client — đơn giản hơn WebSocket |
 
-## 4. Communication Patterns
+---
 
-Describe how services communicate:
+## 2. System Components
 
-- **Synchronous**: REST API / gRPC between services
-- **Asynchronous**: Message queue (RabbitMQ, Kafka, Redis Pub/Sub)
-- **Service Discovery**: Docker Compose DNS / Consul / etc.
+| Component | Responsibility | Tech Stack | Port (host) | Port (container) |
+|-----------|----------------|------------|-------------|------------------|
+| **Frontend** | React SPA — giao diện người dùng, gọi API qua Gateway | React 19, TailwindCSS, Recharts | 5000 | 3000 (nginx) |
+| **Gateway** | Routing, CORS, proxy đến các service | Node.js, Express, axios | 5444 | 5444 |
+| **auth-service** | Đăng ký, đăng nhập, JWT, liên kết phụ huynh | Node.js, Express, Objection.js, bcrypt | — | 8081 |
+| **transaction-service** | Ghi nhận thu chi, ngân sách | Node.js, Express, Objection.js | — | 8082 |
+| **saving-service** | Kế hoạch tiết kiệm, trả góp | Node.js, Express, Objection.js | — | 8083 |
+| **notification-service** | Thông báo real-time qua SSE | Node.js, Express | — | 8084 |
+| **group-service** | Nhóm chi tiêu, chia bill | Node.js, Express, Objection.js | — | 8085 |
+| **MySQL** | Shared MySQL instance — mỗi service sở hữu một database riêng (financial_auth, financial_transaction, financial_saving, financial_notification, financial_group) | MySQL 8.0 | — | 3306 |
+
+> Các service backend (8081–8085) không expose port ra host — chỉ accessible nội bộ qua Docker network.
+
+---
+
+## 3. Communication
 
 ### Inter-service Communication Matrix
 
-| From → To     | Service A | Service B | Gateway | Database |
-|---------------|-----------|-----------|---------|----------|
-| **Frontend**  |           |           | REST    |          |
-| **Gateway**   | REST      | REST      |         |          |
-| **Service A** |           | *(?)* |         | SQL      |
-| **Service B** | *(?)* |           |         | SQL      |
+| From → To | auth | transaction | saving | notification | group | gateway | mysql |
+|-----------|------|-------------|--------|--------------|-------|---------|-------|
+| **Frontend** | — | — | — | SSE stream | — | HTTP REST | — |
+| **Gateway** | HTTP proxy | HTTP proxy | HTTP proxy | HTTP proxy | HTTP proxy | — | — |
+| **auth-service** | — | — | — | HTTP (publish) | — | — | ✅ |
+| **transaction-service** | — | — | — | HTTP (publish) | — | — | ✅ |
+| **saving-service** | — | HTTP (create tx) | — | HTTP (publish) | — | — | ✅ |
+| **notification-service** | — | — | — | — | — | — | ✅ |
+| **group-service** | HTTP (bulk users) | HTTP (create tx) | — | — | — | — | ✅ |
 
-## 5. Data Flow
+**Ghi chú:**
+- `HTTP proxy`: Gateway forward toàn bộ request từ frontend
+- `HTTP (publish)`: Fire-and-forget POST đến `/internal/publish` của notification-service
+- `HTTP (create tx)`: Tạo transaction cá nhân khi saving/installment/group-transaction hoàn thành
+- `HTTP (bulk users)`: group-service gọi auth-service để lấy tên người dùng khi enrich dữ liệu
 
-Describe the typical request flow:
+---
 
-```
-User → Frontend → Gateway → Service A → Database
-                          → Service B → Database
-```
-
-## 6. Architecture Diagram
-
-> Place your diagrams in `docs/asset/` and reference them here.
->
-> Recommended tools: draw.io, Mermaid, PlantUML, Excalidraw
+## 4. Architecture Diagram
 
 ```mermaid
-graph LR
-    U[User] --> FE[Frontend]
-    FE --> GW[API Gateway]
-    GW --> SA[Service A]
-    GW --> SB[Service B]
-    SA --> DB1[(Database A)]
-    SB --> DB2[(Database B)]
+graph TB
+    User["👤 User (Browser)"]
+
+    subgraph app-network [Docker Network: app-network]
+        FE["Frontend\nReact + nginx\nhost:5000"]
+        GW["API Gateway\nNode.js Express\nhost:5444"]
+
+        subgraph services [Backend Services - internal only]
+            AUTH["auth-service :8081"]
+            TRANS["transaction-service :8082"]
+            SAVING["saving-service :8083"]
+            NOTIFY["notification-service :8084"]
+            GROUP["group-service :8085"]
+        end
+
+        DB[("MySQL 8.0\nfinancial_auth\nfinancial_transaction\nfinancial_saving\nfinancial_notification\nfinancial_group")]
+    end
+
+    User -->|HTTP| FE
+    User -->|HTTP REST / SSE| GW
+    FE -->|API calls| GW
+
+    GW --> AUTH
+    GW --> TRANS
+    GW --> SAVING
+    GW --> NOTIFY
+    GW --> GROUP
+
+    AUTH --> DB
+    TRANS --> DB
+    SAVING --> DB
+    NOTIFY --> DB
+    GROUP --> DB
+
+    SAVING -->|"POST /api/transactions"| TRANS
+    GROUP -->|"POST /api/transactions"| TRANS
+    GROUP -->|"POST /api/auth/users/bulk"| AUTH
+    AUTH -->|"publish event"| NOTIFY
+    TRANS -->|"publish event"| NOTIFY
+    SAVING -->|"publish event"| NOTIFY
 ```
 
-![Architecture Diagram](asset/architecture-diagram.png)
+---
 
-## 7. Deployment
+## 5. Deployment
 
-- All services containerized with Docker
-- Orchestrated via Docker Compose
-- Single command: `docker compose up --build`
+- Tất cả service được container hóa với **Docker**
+- Orchestration bằng **Docker Compose** — single command:
 
-## 8. Scalability & Fault Tolerance
+```bash
+docker compose up --build
+```
 
-- How can individual services scale independently?
-- What happens when a service goes down?
-- Are there retry mechanisms or circuit breakers?
-- How is data consistency maintained across services?
+**Startup order** (depends_on + healthcheck):
+1. `mysql` — healthcheck: mysqladmin ping (interval 5s, retries 20)
+2. `auth-service`, `transaction-service`, `saving-service`, `notification-service`, `group-service` — song song sau khi MySQL healthy; mỗi service chạy `npx knex migrate:latest` trước khi start
+3. `gateway` — sau khi tất cả 5 service healthy
+4. `frontend` — sau khi gateway sẵn sàng
+
+**Network**: Tất cả service trong `app-network` (bridge) — giao tiếp qua Docker DNS service name
+
+**Data persistence**: MySQL data lưu vào Docker volume `mysql-data`
+
+**Database initialization**: `mysql/init/01-create-databases.sql` tự động tạo 5 database khi MySQL khởi động lần đầu

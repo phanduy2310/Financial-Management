@@ -1,0 +1,45 @@
+services:
+  transaction-service:
+    build: .
+    ports:
+      - "5001:5001"
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_USER: finance_user
+      MYSQL_PASSWORD: finance_pass
+      MYSQL_DATABASE: financial_transaction
+      PORT: 5001
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - transaction-network
+
+  mysql:
+    image: mysql:8
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: financial_transaction
+      MYSQL_USER: finance_user
+      MYSQL_PASSWORD: finance_pass
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - transaction-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  transaction-network:
+    driver: bridge
+
+volumes:
+  mysql-data:

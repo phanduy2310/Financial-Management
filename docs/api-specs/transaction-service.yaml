@@ -1,0 +1,309 @@
+openapi: 3.0.3
+info:
+  title: Transaction Service API
+  description: Ghi nhận thu chi cá nhân, thống kê tài chính.
+  version: 2.0.0
+
+servers:
+  - url: http://localhost:5001
+    description: Local development
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+        data:
+          description: Payload tuỳ endpoint
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+        code:
+          type: string
+
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        type:
+          type: string
+          enum: [income, expense]
+        category:
+          type: string
+        amount:
+          type: number
+          minimum: 0.01
+        date:
+          type: string
+          format: date
+        note:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    TransactionCreate:
+      type: object
+      required: [type, category, amount, date]
+      properties:
+        type:
+          type: string
+          enum: [income, expense]
+        category:
+          type: string
+        amount:
+          type: number
+          minimum: 0.01
+        date:
+          type: string
+          format: date
+        note:
+          type: string
+          nullable: true
+
+    StatsSummary:
+      type: object
+      properties:
+        period:
+          type: string
+          enum: [month, year]
+        month:
+          type: integer
+        year:
+          type: integer
+        opening_balance:
+          type: number
+        total_income:
+          type: number
+        total_expense:
+          type: number
+        closing_balance:
+          type: number
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      operationId: healthCheck
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/transactions:
+    get:
+      summary: Lấy danh sách giao dịch theo tháng
+      operationId: getAllByMonth
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+          description: Tháng (mặc định tháng hiện tại)
+        - name: year
+          in: query
+          schema:
+            type: integer
+          description: Năm (mặc định năm hiện tại)
+      responses:
+        '200':
+          description: Danh sách giao dịch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          description: Chưa xác thực
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      summary: Tạo giao dịch mới
+      operationId: createTransaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransactionCreate'
+      responses:
+        '201':
+          description: Tạo thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Thiếu hoặc sai dữ liệu
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/transactions/detail/{id}:
+    get:
+      summary: Chi tiết một giao dịch
+      operationId: getTransactionDetail
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Chi tiết giao dịch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '403':
+          description: Không có quyền truy cập
+        '404':
+          description: Không tìm thấy
+
+  /api/transactions/{id}:
+    put:
+      summary: Cập nhật giao dịch
+      operationId: updateTransaction
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransactionCreate'
+      responses:
+        '200':
+          description: Cập nhật thành công
+        '403':
+          description: Không có quyền truy cập
+        '404':
+          description: Không tìm thấy
+
+    delete:
+      summary: Xoá giao dịch
+      operationId: deleteTransaction
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Đã xoá
+        '403':
+          description: Không có quyền truy cập
+        '404':
+          description: Không tìm thấy
+
+  /api/transactions/stats/summary:
+    get:
+      summary: Tổng quan thu/chi/số dư đầu kì của tháng hoặc năm
+      operationId: getStatsSummary
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [month, year]
+          description: Loại thống kê (mặc định month)
+        - name: month
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+          description: Tháng (bắt buộc nếu period=month)
+        - name: year
+          in: query
+          schema:
+            type: integer
+          description: Năm
+      responses:
+        '200':
+          description: Tổng quan tài chính
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/StatsSummary'
+        '400':
+          description: Tham số không hợp lệ
+
+  /api/transactions/stats/category:
+    get:
+      summary: Thống kê theo danh mục
+      operationId: getStatsByCategory
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+        - name: year
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Thống kê theo danh mục
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Tham số không hợp lệ
