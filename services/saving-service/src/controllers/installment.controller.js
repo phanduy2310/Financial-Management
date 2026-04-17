@@ -22,6 +22,15 @@ function sendError(res, err) {
     return res.status(500).json({ error: err.message });
 }
 
+function calculateActualPaymentAmount(plan) {
+    const remainingAmount = Math.max(
+        Number(plan.total_amount) - Number(plan.paid_amount),
+        0
+    );
+
+    return Math.min(Number(plan.monthly_payment), remainingAmount);
+}
+
 // 🆕 1. Tạo kế hoạch trả góp
 exports.create = async (req, res) => {
     try {
@@ -88,8 +97,8 @@ exports.payInstallment = async (req, res) => {
                 );
             }
 
-            let newPaidAmount =
-                Number(plan.paid_amount) + Number(plan.monthly_payment);
+            const actualPaymentAmount = calculateActualPaymentAmount(plan);
+            let newPaidAmount = Number(plan.paid_amount) + actualPaymentAmount;
             const newTerm = plan.current_term + 1;
 
             if (newPaidAmount > plan.total_amount) {
@@ -114,7 +123,7 @@ exports.payInstallment = async (req, res) => {
                 user_id: plan.user_id,
                 category: "Thanh toán khoản trả góp",
                 type: "expense",
-                amount: Number(plan.monthly_payment),
+                amount: actualPaymentAmount,
                 date: new Date().toISOString().slice(0, 10),
                 note: `Thanh toán kỳ ${newTerm} cho khoản trả góp: ${plan.title}`,
             };
@@ -151,7 +160,7 @@ exports.payInstallment = async (req, res) => {
             await InstallmentPayment.query(trx).insert({
                 plan_id: Number(id),
                 term_number: newTerm,
-                amount: Number(plan.monthly_payment),
+                amount: actualPaymentAmount,
                 note,
                 pay_date: today,
             });
