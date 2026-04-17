@@ -245,6 +245,50 @@ paths:
         '404':
           description: Không tìm thấy
 
+  /api/transactions/stats/monthly-summary:
+    get:
+      summary: Thống kê thu chi N tháng gần nhất
+      operationId: getMonthlySummary
+      parameters:
+        - name: months
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 24
+            default: 6
+          description: Số tháng gần nhất cần thống kê
+      responses:
+        '200':
+          description: Thống kê từng tháng
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          months:
+                            type: integer
+                          data:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                year:
+                                  type: integer
+                                month:
+                                  type: integer
+                                total_income:
+                                  type: number
+                                total_expense:
+                                  type: number
+        '400':
+          description: Tham số không hợp lệ
+
   /api/transactions/stats/summary:
     get:
       summary: Tổng quan thu/chi/số dư đầu kì của tháng hoặc năm

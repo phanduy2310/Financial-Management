@@ -16,6 +16,9 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+.env.dev
+.env.prod
+.env.*
 *.pem
 *.key
 *.cert
@@ -115,4 +118,4 @@ test-results/
 # Ignored Services
 # ==============================
 services/category-service/
-service/transaction-service/scripts
+services/transaction-service/scripts/
