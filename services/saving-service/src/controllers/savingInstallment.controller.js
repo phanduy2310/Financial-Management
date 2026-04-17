@@ -6,6 +6,9 @@ const {
     loadSavingPlanForUpdate,
     publishSavingPlanCompleted,
 } = require("../services/savingPlanState.service");
+const {
+    validateSavingInstallmentCreateInput,
+} = require("../utils/requestValidators");
 
 function sendError(res, err) {
     if (err.status) {
@@ -17,15 +20,11 @@ function sendError(res, err) {
 
 exports.addInstallment = async (req, res) => {
     try {
-        const savingPlanId =
-            req.params.saving_plan_id || req.body.saving_plan_id;
-        const { amount, note, payment_date } = req.body;
-
-        if (!savingPlanId || !amount) {
-            return res
-                .status(400)
-                .json({ message: "Thiếu thông tin cần thiết" });
-        }
+        const { saving_plan_id: savingPlanId, amount, note, payment_date } =
+            validateSavingInstallmentCreateInput({
+                params: req.params,
+                body: req.body,
+            });
 
         let installment;
         let progress;

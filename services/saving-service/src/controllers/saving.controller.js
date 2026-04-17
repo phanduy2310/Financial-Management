@@ -5,6 +5,11 @@ const {
     loadSavingPlanForUpdate,
     publishSavingPlanCompleted,
 } = require("../services/savingPlanState.service");
+const {
+    validateSavingCreateInput,
+    validateSavingProgressInput,
+    validateSavingUpdateInput,
+} = require("../utils/requestValidators");
 
 function sendError(res, err) {
     if (err.status) {
@@ -21,13 +26,7 @@ function sendError(res, err) {
 exports.create = async (req, res) => {
     try {
         const { user_id, title, target_amount, start_date, end_date } =
-            req.body;
-
-        if (!user_id || !title || !target_amount || !start_date || !end_date) {
-            return res
-                .status(400)
-                .json({ message: "Thiếu thông tin cần thiết" });
-        }
+            validateSavingCreateInput(req.body);
 
         const plan = await SavingPlan.query().insert({
             user_id,
@@ -41,7 +40,7 @@ exports.create = async (req, res) => {
 
         res.status(201).json({ message: "Tạo kế hoạch thành công", plan });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        return sendError(res, err);
     }
 };
 
@@ -69,7 +68,7 @@ exports.getAllByUser = async (req, res) => {
 exports.updateProgress = async (req, res) => {
     try {
         const { id } = req.params;
-        const { current_amount } = req.body;
+        const { current_amount } = validateSavingProgressInput(req.body);
 
         let updated;
         let notifyPayload = null;
@@ -139,25 +138,19 @@ exports.markCompleted = async (req, res) => {
 exports.updateInfo = async (req, res) => {
     try {
         const { id } = req.params;
-        const { title, target_amount, start_date, end_date } = req.body;
-        const fields = {};
-        if (title !== undefined) fields.title = title;
-        if (target_amount !== undefined) fields.target_amount = target_amount;
-        if (start_date !== undefined) fields.start_date = start_date;
-        if (end_date !== undefined) fields.end_date = end_date;
-
-        if (Object.keys(fields).length === 0) {
-            return res.status(400).json({ message: "Không có thông tin cần cập nhật" });
+        const plan = await SavingPlan.query().findById(id);
+        if (!plan) {
+            return res.status(404).json({ message: "Không tìm thấy kế hoạch" });
         }
 
+        const fields = validateSavingUpdateInput(req.body, plan);
         const updated = await SavingPlan.query().findById(id).patchAndFetch(fields);
-        if (!updated) return res.status(404).json({ message: "Không tìm thấy kế hoạch" });
         res.json({
             message: "Cập nhật thông tin kế hoạch thành công",
             plan: updated,
         });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        return sendError(res, err);
     }
 };
 

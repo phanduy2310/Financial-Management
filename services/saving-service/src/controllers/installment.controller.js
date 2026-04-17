@@ -2,6 +2,10 @@ const InstallmentPlan = require("../models/installment.model");
 const InstallmentPayment = require("../models/installment_payment.model");
 const transactionClient = require("../clients/transaction.client");
 const notifyClient = require("../clients/notification.client");
+const {
+    validateInstallmentCreateInput,
+    validateInstallmentUpdateInput,
+} = require("../utils/requestValidators");
 
 function buildHttpError(status, message, details) {
     const err = new Error(message);
@@ -42,19 +46,7 @@ exports.create = async (req, res) => {
             start_date,
             end_date,
             total_terms,
-        } = req.body;
-        if (
-            !user_id ||
-            !title ||
-            !total_amount ||
-            !monthly_payment ||
-            !start_date ||
-            !end_date ||
-            !total_terms
-        )
-            return res
-                .status(400)
-                .json({ message: "Thiếu thông tin cần thiết" });
+        } = validateInstallmentCreateInput(req.body);
 
         const plan = await InstallmentPlan.query().insert({
             user_id: Number(user_id),
@@ -71,7 +63,7 @@ exports.create = async (req, res) => {
 
         res.status(201).json({ message: "Tạo khoản trả góp thành công", plan });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        return sendError(res, err);
     }
 };
 
@@ -279,23 +271,12 @@ exports.updateInfo = async (req, res) => {
                 .status(404)
                 .json({ message: "Không tìm thấy khoản trả góp" });
 
-        const { title, total_amount, monthly_payment, start_date, end_date, total_terms } = req.body;
-        const fields = {};
-        if (title !== undefined) fields.title = title;
-        if (total_amount !== undefined) fields.total_amount = parseFloat(total_amount);
-        if (monthly_payment !== undefined) fields.monthly_payment = parseFloat(monthly_payment);
-        if (start_date !== undefined) fields.start_date = start_date;
-        if (end_date !== undefined) fields.end_date = end_date;
-        if (total_terms !== undefined) fields.total_terms = parseInt(total_terms);
-
-        if (Object.keys(fields).length === 0) {
-            return res.status(400).json({ message: "Không có thông tin cần cập nhật" });
-        }
+        const fields = validateInstallmentUpdateInput(req.body, plan);
 
         const updated = await plan.$query().patchAndFetch(fields);
         res.json({ message: "Cập nhật thông tin thành công", plan: updated });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        return sendError(res, err);
     }
 };
 
