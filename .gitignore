@@ -115,4 +115,4 @@ test-results/
 # Ignored Services
 # ==============================
 services/category-service/
-service/transaction-service/scripts
+services/transaction-service/scripts/

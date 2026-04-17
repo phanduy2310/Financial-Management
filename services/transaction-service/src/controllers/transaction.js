@@ -56,7 +56,8 @@ exports.getTransactionDetail = async (req, res) => {
     try {
         const result = await service.getById(req.params.id);
         if (!result) return error(res, "Giao dịch không tìm thấy", 404, "NOT_FOUND");
-        if (result.user_id !== req.user.id) return error(res, "Không có quyền truy cập", 403, "FORBIDDEN");
+        //phụ huynh có thể truy cập
+        // if (result.user_id !== req.user.id) return error(res, "Không có quyền truy cập", 403, "FORBIDDEN");
 
         success(res, result);
     } catch (err) {
@@ -209,6 +210,41 @@ exports.getStatsSummary = async (req, res) => {
     } catch (err) {
         console.error("[STATS SUMMARY ERROR]", err);
         return error(res, "Không thể lấy thống kê tổng quan", 500, "STATS_SUMMARY_ERROR");
+    }
+};
+
+exports.getMonthlySummary = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const months = Number(req.query.months) || 6;
+
+        if (!Number.isInteger(months) || months < 1 || months > 24) {
+            return error(
+                res,
+                "months must be an integer between 1 and 24",
+                400,
+                "INVALID_MONTHS"
+            );
+        }
+
+        const result = await service.getMonthlySummary(userId, months);
+
+        return success(
+            res,
+            {
+                months,
+                data: result
+            },
+            "Lấy dữ liệu thống kê các tháng gần nhất thành công"
+        );
+    } catch (err) {
+        console.error("[GET MONTHLY SUMMARY ERROR]", err);
+        return error(
+            res,
+            "Không thể lấy dữ liệu thống kê các tháng gần nhất",
+            500,
+            "GET_MONTHLY_SUMMARY_ERROR"
+        );
     }
 };
 
