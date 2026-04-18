@@ -2,21 +2,33 @@ openapi: 3.0.3
 info:
   title: Saving Service API
   description: |
-    Wealth Context — quản lý kế hoạch tiết kiệm và trả góp.
-  version: 1.0.0
+    API contract của saving-service, đồng bộ theo route, controller và validator hiện tại.
+    Lưu ý: một số URL runtime dùng cùng pattern path cho nhiều mục đích khác nhau theo HTTP method
+    (ví dụ `/api/saving/:value` và `/api/installment/:value`). File này mô tả đúng behavior hiện tại.
+  version: 1.1.0
 
 servers:
+  - url: http://localhost:8083
+    description: Saving service trực tiếp (default local)
   - url: http://localhost:5444
     description: Qua API Gateway (development)
+
+tags:
+  - name: Health
+  - name: Saving Plans
+  - name: Saving Installments
+  - name: Installment Plans
 
 paths:
   /health:
     get:
-      summary: Health check (gateway)
+      tags:
+        - Health
+      summary: Health check
       operationId: healthCheck
       responses:
         '200':
-          description: OK
+          description: Service hoạt động bình thường
           content:
             application/json:
               schema:
@@ -24,6 +36,8 @@ paths:
 
   /api/saving:
     post:
+      tags:
+        - Saving Plans
       summary: Tạo kế hoạch tiết kiệm mới
       operationId: createSavingPlan
       requestBody:
@@ -31,85 +45,222 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SavingPlanCreate'
+              $ref: '#/components/schemas/SavingPlanCreateRequest'
       responses:
         '201':
-          description: Tạo thành công — trả về {message, plan:{...}}
+          description: Tạo kế hoạch thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavingPlanMessageResponse'
         '400':
           description: Dữ liệu không hợp lệ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
 
   /api/saving/all:
     get:
+      tags:
+        - Saving Plans
       summary: Lấy tất cả kế hoạch tiết kiệm
-      operationId: getAllPlans
+      operationId: getAllSavingPlans
       responses:
         '200':
           description: Danh sách tất cả kế hoạch
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SavingPlan'
 
-  /api/saving/{user_id}:
+  /api/saving/{id}:
     get:
-      summary: Lấy danh sách kế hoạch tiết kiệm của user
-      operationId: getPlansByUser
+      tags:
+        - Saving Plans
+      summary: Lấy danh sách kế hoạch tiết kiệm của một user
+      description: |
+        Runtime route hiện tại là `GET /api/saving/:user_id`.
+        Trong operation này, path param `id` chính là `user_id`.
+      operationId: getSavingPlansByUser
       parameters:
-        - name: user_id
+        - name: id
           in: path
           required: true
+          description: User ID
           schema:
             type: integer
       responses:
         '200':
-          description: Danh sách kế hoạch
+          description: Danh sách kế hoạch của user
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SavingPlan'
+    put:
+      tags:
+        - Saving Plans
+      summary: Cập nhật thông tin kế hoạch tiết kiệm
+      operationId: updateSavingPlan
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Saving plan ID
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SavingPlanUpdateRequest'
+      responses:
+        '200':
+          description: Cập nhật kế hoạch thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavingPlanMessageResponse'
+        '400':
+          description: Dữ liệu không hợp lệ hoặc không có field hợp lệ để cập nhật
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '404':
+          description: Không tìm thấy kế hoạch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageErrorResponse'
+        '500':
+          description: Tạo transaction thất bại khi kế hoạch vừa chuyển sang hoàn thành
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownstreamErrorResponse'
+    delete:
+      tags:
+        - Saving Plans
+      summary: Xóa kế hoạch tiết kiệm
+      operationId: deleteSavingPlan
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Saving plan ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Xóa kế hoạch thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleMessageResponse'
+        '404':
+          description: Không tìm thấy kế hoạch để xóa
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageErrorResponse'
 
   /api/saving/{user_id}/stats:
     get:
-      summary: Thống kê tiết kiệm của user
+      tags:
+        - Saving Plans
+      summary: Lấy thống kê saving plans của user
       operationId: getSavingStats
       parameters:
         - name: user_id
           in: path
           required: true
+          description: User ID
           schema:
             type: integer
       responses:
         '200':
-          description: Thống kê tiết kiệm
+          description: Thống kê tổng quan saving plans
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavingStats'
 
   /api/saving/{user_id}/top:
     get:
-      summary: Top kế hoạch tiết kiệm của user
-      operationId: getTopPlans
+      tags:
+        - Saving Plans
+      summary: Lấy tối đa 3 saving plans có tiến độ cao nhất của user
+      operationId: getTopSavingPlans
       parameters:
         - name: user_id
           in: path
           required: true
+          description: User ID
           schema:
             type: integer
       responses:
         '200':
-          description: Top kế hoạch
+          description: Top saving plans theo tiến độ
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 3
+                items:
+                  $ref: '#/components/schemas/SavingPlan'
 
   /api/saving/{id}/history:
     get:
-      summary: Lịch sử tiến độ của kế hoạch
-      operationId: getPlanHistory
+      tags:
+        - Saving Plans
+      summary: Lấy lịch sử tiến độ của kế hoạch tiết kiệm
+      operationId: getSavingPlanHistory
       parameters:
         - name: id
           in: path
           required: true
+          description: Saving plan ID
           schema:
             type: integer
       responses:
         '200':
-          description: Lịch sử tiến độ
+          description: Danh sách các mốc tiến độ
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SavingProgressPoint'
+        '404':
+          description: Không tìm thấy kế hoạch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageErrorResponse'
+        '500':
+          description: Lỗi server nội bộ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalErrorResponse'
 
   /api/saving/{id}/progress:
     put:
-      summary: Cập nhật tiến độ (số tiền hiện tại)
-      operationId: updateProgress
+      tags:
+        - Saving Plans
+      summary: Cập nhật current_amount của kế hoạch tiết kiệm
+      operationId: updateSavingPlanProgress
       parameters:
         - name: id
           in: path
           required: true
+          description: Saving plan ID
           schema:
             type: integer
       requestBody:
@@ -117,71 +268,83 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [current_amount]
-              properties:
-                current_amount:
-                  type: number
+              $ref: '#/components/schemas/SavingProgressUpdateRequest'
       responses:
         '200':
-          description: Cập nhật thành công
+          description: Cập nhật tiến độ thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavingPlanMessageResponse'
+        '400':
+          description: Dữ liệu không hợp lệ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
         '404':
-          description: Không tìm thấy
+          description: Không tìm thấy kế hoạch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageErrorResponse'
+        '500':
+          description: Tạo transaction thất bại khi kế hoạch vừa hoàn thành
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownstreamErrorResponse'
 
   /api/saving/{id}/complete:
     put:
-      summary: Đánh dấu kế hoạch hoàn thành
-      operationId: markCompleted
+      tags:
+        - Saving Plans
+      summary: Đánh dấu kế hoạch tiết kiệm là hoàn thành
+      operationId: markSavingPlanCompleted
       parameters:
         - name: id
           in: path
           required: true
+          description: Saving plan ID
           schema:
             type: integer
       responses:
         '200':
-          description: Đánh dấu thành công
-
-  /api/saving/{id}:
-    put:
-      summary: Cập nhật thông tin kế hoạch
-      operationId: updatePlanInfo
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SavingPlanCreate'
-      responses:
-        '200':
-          description: Cập nhật thành công
-    delete:
-      summary: Xoá kế hoạch
-      operationId: deletePlan
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        '200':
-          description: Đã xoá
+          description: Đánh dấu hoàn thành thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavingPlanMessageResponse'
+        '400':
+          description: Kế hoạch đã hoàn thành trước đó
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageErrorResponse'
+        '404':
+          description: Không tìm thấy kế hoạch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageErrorResponse'
+        '500':
+          description: Tạo transaction thất bại
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownstreamErrorResponse'
 
   /api/saving/{saving_plan_id}/installments:
     post:
-      summary: Thêm kỳ trả góp vào kế hoạch tiết kiệm
-      operationId: addInstallmentToPlan
+      tags:
+        - Saving Installments
+      summary: Thêm một khoản đóng góp vào saving plan
+      operationId: addSavingInstallment
       parameters:
         - name: saving_plan_id
           in: path
           required: true
+          description: Saving plan ID
           schema:
             type: integer
       requestBody:
@@ -189,159 +352,350 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                amount:
-                  type: number
-                due_date:
-                  type: string
-                  format: date
+              $ref: '#/components/schemas/SavingInstallmentCreateRequest'
       responses:
         '201':
-          description: Thêm thành công — trả về {message, payment:{...}}
+          description: Thêm khoản đóng góp thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavingInstallmentCreateResponse'
+        '400':
+          description: Dữ liệu không hợp lệ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '404':
+          description: Không tìm thấy saving plan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageErrorResponse'
+        '500':
+          description: Tạo transaction thất bại khi saving plan vừa hoàn thành
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownstreamErrorResponse'
     get:
-      summary: Lấy các kỳ trả góp của kế hoạch
-      operationId: getInstallmentsByPlan
+      tags:
+        - Saving Installments
+      summary: Lấy danh sách khoản đóng góp của saving plan
+      operationId: getSavingInstallmentsByPlan
       parameters:
         - name: saving_plan_id
           in: path
           required: true
+          description: Saving plan ID
           schema:
             type: integer
       responses:
         '200':
-          description: Danh sách kỳ trả góp
+          description: Danh sách khoản đóng góp, sắp xếp theo payment_date giảm dần
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SavingInstallment'
 
-  /api/installment:
-    post:
-      summary: Tạo kế hoạch trả góp mới
-      operationId: createInstallment
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/InstallmentCreate'
-      responses:
-        '201':
-          description: Tạo thành công — trả về {message, plan:{...}}
-
-  /api/installment/{user_id}:
-    get:
-      summary: Lấy danh sách trả góp của user
-      operationId: getInstallmentsByUser
-      parameters:
-        - name: user_id
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        '200':
-          description: Danh sách trả góp
-
-  /api/installment/detail/{id}:
-    get:
-      summary: Chi tiết kế hoạch trả góp
-      operationId: getInstallmentDetail
+  /api/saving/installments/{id}:
+    delete:
+      tags:
+        - Saving Installments
+      summary: Xóa một khoản đóng góp của saving plan
+      operationId: deleteSavingInstallment
       parameters:
         - name: id
           in: path
           required: true
+          description: Saving installment ID
           schema:
             type: integer
       responses:
         '200':
-          description: Chi tiết trả góp
+          description: Xóa khoản đóng góp thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavingInstallmentDeleteResponse'
+        '404':
+          description: Không tìm thấy khoản đóng góp
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageErrorResponse'
+        '500':
+          description: Lỗi server nội bộ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalErrorResponse'
+
+  /api/installment:
+    post:
+      tags:
+        - Installment Plans
+      summary: Tạo khoản trả góp mới
+      operationId: createInstallmentPlan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InstallmentPlanCreateRequest'
+      responses:
+        '201':
+          description: Tạo khoản trả góp thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstallmentPlanMessageResponse'
+        '400':
+          description: Dữ liệu không hợp lệ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+
+  /api/installment/{id}:
+    get:
+      tags:
+        - Installment Plans
+      summary: Lấy danh sách khoản trả góp của một user
+      description: |
+        Runtime route hiện tại là `GET /api/installment/:user_id`.
+        Trong operation này, path param `id` chính là `user_id`.
+      operationId: getInstallmentPlansByUser
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Danh sách khoản trả góp của user
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InstallmentPlan'
+    delete:
+      tags:
+        - Installment Plans
+      summary: Xóa khoản trả góp
+      operationId: deleteInstallmentPlan
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Installment plan ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Xóa khoản trả góp và lịch sử liên quan thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleMessageResponse'
+        '404':
+          description: Không tìm thấy khoản trả góp để xóa
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageErrorResponse'
+
+  /api/installment/detail/{id}:
+    get:
+      tags:
+        - Installment Plans
+      summary: Lấy chi tiết một khoản trả góp
+      operationId: getInstallmentPlanById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Installment plan ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Chi tiết khoản trả góp
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstallmentPlan'
+        '404':
+          description: Không tìm thấy khoản trả góp
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageErrorResponse'
+        '500':
+          description: Lỗi server nội bộ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalErrorResponse'
 
   /api/installment/stats/{user_id}:
     get:
-      summary: Thống kê trả góp của user
+      tags:
+        - Installment Plans
+      summary: Lấy thống kê khoản trả góp của user
       operationId: getInstallmentStats
       parameters:
         - name: user_id
           in: path
           required: true
+          description: User ID
           schema:
             type: integer
       responses:
         '200':
-          description: Thống kê trả góp
+          description: Thống kê tổng quan installment plans
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstallmentStats'
 
   /api/installment/top/{user_id}:
     get:
-      summary: Top kế hoạch trả góp sắp hoàn thành
-      operationId: getTopInstallments
+      tags:
+        - Installment Plans
+      summary: Lấy tối đa 3 khoản trả góp có tiến độ cao nhất
+      operationId: getTopInstallmentPlans
       parameters:
         - name: user_id
           in: path
           required: true
+          description: User ID
           schema:
             type: integer
       responses:
         '200':
-          description: Top kế hoạch trả góp
+          description: Top installment plans theo tiến độ
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 3
+                items:
+                  $ref: '#/components/schemas/InstallmentPlan'
 
   /api/installment/history/{id}:
     get:
-      summary: Lịch sử thanh toán của kế hoạch trả góp
-      operationId: getInstallmentHistory
+      tags:
+        - Installment Plans
+      summary: Lấy lịch sử thanh toán của khoản trả góp
+      operationId: getInstallmentPaymentHistory
       parameters:
         - name: id
           in: path
           required: true
+          description: Installment plan ID
           schema:
             type: integer
       responses:
         '200':
-          description: Lịch sử thanh toán
+          description: Danh sách lịch sử thanh toán
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InstallmentHistoryPoint'
+        '500':
+          description: Lỗi server nội bộ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalErrorResponse'
 
   /api/installment/payments/chart/{user_id}:
     get:
-      summary: Dữ liệu biểu đồ thanh toán hàng tháng
-      operationId: getPaymentChart
+      tags:
+        - Installment Plans
+      summary: Lấy dữ liệu chart thanh toán trả góp theo ngày
+      operationId: getInstallmentPaymentChart
       parameters:
         - name: user_id
           in: path
           required: true
+          description: User ID
           schema:
             type: integer
       responses:
         '200':
-          description: Dữ liệu biểu đồ
+          description: Dữ liệu chart thanh toán
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InstallmentChartPoint'
+        '500':
+          description: Lỗi server nội bộ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalErrorResponse'
 
   /api/installment/{id}/pay:
     patch:
-      summary: Thanh toán một kỳ trả góp
-      operationId: payInstallment
+      tags:
+        - Installment Plans
+      summary: Thanh toán kỳ tiếp theo của khoản trả góp
+      operationId: payInstallmentPlan
       parameters:
         - name: id
           in: path
           required: true
+          description: Installment plan ID
           schema:
             type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [amount]
-              properties:
-                amount:
-                  type: number
       responses:
         '200':
           description: Thanh toán thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstallmentPlanMessageResponse'
+        '400':
+          description: Khoản trả góp đã hoàn thành hoặc không thể thanh toán thêm
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageErrorResponse'
+        '404':
+          description: Không tìm thấy khoản trả góp
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageErrorResponse'
+        '500':
+          description: Tạo transaction thất bại
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownstreamErrorResponse'
 
   /api/installment/{id}/update:
     patch:
-      summary: Cập nhật thông tin kế hoạch trả góp
-      operationId: updateInstallment
+      tags:
+        - Installment Plans
+      summary: Cập nhật thông tin khoản trả góp
+      operationId: updateInstallmentPlan
       parameters:
         - name: id
           in: path
           required: true
+          description: Installment plan ID
           schema:
             type: integer
       requestBody:
@@ -349,24 +703,26 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/InstallmentCreate'
+              $ref: '#/components/schemas/InstallmentPlanUpdateRequest'
       responses:
         '200':
-          description: Cập nhật thành công
-
-  /api/installment/{id}:
-    delete:
-      summary: Xoá kế hoạch trả góp
-      operationId: deleteInstallment
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        '200':
-          description: Đã xoá
+          description: Cập nhật khoản trả góp thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstallmentPlanMessageResponse'
+        '400':
+          description: Dữ liệu không hợp lệ hoặc không có field hợp lệ để cập nhật
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '404':
+          description: Không tìm thấy khoản trả góp
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageErrorResponse'
 
 components:
   schemas:
@@ -376,36 +732,449 @@ components:
         status:
           type: string
           example: ok
+      required:
+        - status
 
-    SavingPlanCreate:
+    SavingPlan:
       type: object
-      required: [user_id, title, target_amount]
+      properties:
+        id:
+          type: integer
+          example: 1
+        user_id:
+          type: integer
+          example: 7
+        title:
+          type: string
+          example: Mua laptop
+        target_amount:
+          type: number
+          example: 30000000
+        current_amount:
+          type: number
+          example: 5000000
+        start_date:
+          type: string
+          format: date
+          example: '2026-04-01'
+        end_date:
+          type: string
+          format: date
+          example: '2026-12-31'
+        completed:
+          type: boolean
+          example: false
+        progress_percentage:
+          type: number
+          example: 16.67
+        created_at:
+          type: string
+          example: '2026-04-18T03:10:00.000Z'
+        updated_at:
+          type: string
+          example: '2026-04-18T03:10:00.000Z'
+
+    SavingPlanCreateRequest:
+      type: object
+      required:
+        - user_id
+        - title
+        - target_amount
+        - start_date
+        - end_date
       properties:
         user_id:
           type: integer
+          minimum: 1
         title:
           type: string
         target_amount:
           type: number
-          minimum: 1
-        deadline:
+          exclusiveMinimum: 0
+        start_date:
+          type: string
+          format: date
+        end_date:
           type: string
           format: date
 
-    InstallmentCreate:
+    SavingPlanUpdateRequest:
       type: object
-      required: [user_id, title, total_amount, monthly_payment]
+      description: |
+        Partial update. Chỉ chấp nhận `title`, `target_amount`, `start_date`, `end_date`.
+        Không được gửi `current_amount`, `completed`, `progress_percentage`.
+      properties:
+        title:
+          type: string
+        target_amount:
+          type: number
+          exclusiveMinimum: 0
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+
+    SavingProgressUpdateRequest:
+      type: object
+      required:
+        - current_amount
+      properties:
+        current_amount:
+          type: number
+          minimum: 0
+
+    SavingStats:
+      type: object
+      properties:
+        total_plans:
+          type: integer
+          example: 3
+        completed:
+          type: integer
+          example: 1
+        total_saving:
+          type: number
+          example: 12500000
+        avg_progress:
+          type: number
+          example: 41.67
+      required:
+        - total_plans
+        - completed
+        - total_saving
+        - avg_progress
+
+    SavingProgressPoint:
+      type: object
+      properties:
+        date:
+          type: string
+          example: '2026-04-18'
+        progress:
+          type: number
+          example: 33.33
+      required:
+        - date
+        - progress
+
+    SavingInstallment:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 12
+        saving_plan_id:
+          type: integer
+          example: 1
+        amount:
+          type: number
+          example: 1000000
+        note:
+          type: string
+          nullable: true
+          example: Đóng góp tháng 4
+        payment_date:
+          type: string
+          example: '2026-04-18 10:00:00'
+        created_at:
+          type: string
+          example: '2026-04-18T03:10:00.000Z'
+        updated_at:
+          type: string
+          example: '2026-04-18T03:10:00.000Z'
+
+    SavingInstallmentCreateRequest:
+      type: object
+      required:
+        - amount
+      properties:
+        amount:
+          type: number
+          exclusiveMinimum: 0
+        note:
+          type: string
+          description: Ghi chú tự do
+        payment_date:
+          type: string
+          description: |
+            Ngày hợp lệ. Code hiện chấp nhận `YYYY-MM-DD`, ISO datetime,
+            hoặc chuỗi datetime parse được bởi JavaScript Date.
+          example: '2026-04-18T10:00:00.000Z'
+
+    SavingInstallmentCreateResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Đã thêm khoản trả góp
+        installment:
+          $ref: '#/components/schemas/SavingInstallment'
+        new_progress:
+          type: number
+          example: 33.33
+      required:
+        - message
+        - installment
+        - new_progress
+
+    SavingInstallmentDeleteResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Đã xóa khoản trả góp
+        new_progress:
+          type: number
+          example: 20
+      required:
+        - message
+        - new_progress
+
+    InstallmentPlan:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 3
+        user_id:
+          type: integer
+          example: 7
+        title:
+          type: string
+          example: Trả góp điện thoại
+        total_amount:
+          type: number
+          example: 24000000
+        paid_amount:
+          type: number
+          example: 8000000
+        monthly_payment:
+          type: number
+          example: 2000000
+        start_date:
+          type: string
+          format: date
+          example: '2026-01-01'
+        end_date:
+          type: string
+          format: date
+          example: '2026-12-31'
+        current_term:
+          type: integer
+          example: 4
+        total_terms:
+          type: integer
+          example: 12
+        completed:
+          type: boolean
+          example: false
+        progress_percentage:
+          type: number
+          example: 33.33
+        created_at:
+          type: string
+          example: '2026-04-18T03:10:00.000Z'
+        updated_at:
+          type: string
+          example: '2026-04-18T03:10:00.000Z'
+
+    InstallmentPlanCreateRequest:
+      type: object
+      required:
+        - user_id
+        - title
+        - total_amount
+        - monthly_payment
+        - start_date
+        - end_date
+        - total_terms
       properties:
         user_id:
           type: integer
+          minimum: 1
         title:
           type: string
         total_amount:
           type: number
-          minimum: 1
+          exclusiveMinimum: 0
         monthly_payment:
           type: number
-          minimum: 1
+          exclusiveMinimum: 0
         start_date:
           type: string
           format: date
+        end_date:
+          type: string
+          format: date
+        total_terms:
+          type: integer
+          minimum: 1
+
+    InstallmentPlanUpdateRequest:
+      type: object
+      description: |
+        Partial update. Chỉ chấp nhận `title`, `total_amount`, `monthly_payment`,
+        `start_date`, `end_date`, `total_terms`.
+        Không được gửi `paid_amount`, `current_term`, `completed`, `progress_percentage`.
+      properties:
+        title:
+          type: string
+        total_amount:
+          type: number
+          exclusiveMinimum: 0
+        monthly_payment:
+          type: number
+          exclusiveMinimum: 0
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        total_terms:
+          type: integer
+          minimum: 1
+
+    InstallmentStats:
+      type: object
+      properties:
+        total_plans:
+          type: integer
+          example: 2
+        completed:
+          type: integer
+          example: 1
+        total_debt:
+          type: number
+          example: 6000000
+        total_paid:
+          type: number
+          example: 18000000
+        avg_progress:
+          type: number
+          example: 62.5
+      required:
+        - total_plans
+        - completed
+        - total_debt
+        - total_paid
+        - avg_progress
+
+    InstallmentHistoryPoint:
+      type: object
+      properties:
+        date:
+          type: string
+          description: Format theo locale vi-VN
+          example: 18/04/2026
+        amount:
+          type: number
+          example: 2000000
+        term:
+          type: integer
+          example: 5
+        note:
+          type: string
+          example: Thanh toán kỳ 5 (18/04/2026)
+      required:
+        - date
+        - amount
+        - term
+        - note
+
+    InstallmentChartPoint:
+      type: object
+      properties:
+        date:
+          type: string
+          description: Format theo locale vi-VN
+          example: 18/04/2026
+        amount:
+          type: number
+          example: 4000000
+      required:
+        - date
+        - amount
+
+    SavingPlanMessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Cập nhật tiến độ thành công
+        plan:
+          $ref: '#/components/schemas/SavingPlan'
+      required:
+        - message
+        - plan
+
+    InstallmentPlanMessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Đã thanh toán kỳ mới thành công
+        plan:
+          $ref: '#/components/schemas/InstallmentPlan'
+      required:
+        - message
+        - plan
+
+    SimpleMessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Đã xóa kế hoạch thành công
+      required:
+        - message
+
+    MessageErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Không tìm thấy kế hoạch
+      required:
+        - message
+
+    ValidationErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Du lieu khong hop le
+        error:
+          type: array
+          items:
+            type: string
+          example:
+            - start_date phai theo dinh dang YYYY-MM-DD
+            - end_date phai theo dinh dang YYYY-MM-DD
+      required:
+        - message
+        - error
+
+    DownstreamErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Thanh toán kỳ nhưng tạo transaction thất bại
+        error:
+          type: string
+          example: connect ECONNREFUSED
+      required:
+        - message
+        - error
+
+    InternalErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Internal server error
+      required:
+        - error
