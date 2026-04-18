@@ -40,6 +40,7 @@ exports.up = async function (knex) {
         table.string("category").notNullable();
         table.decimal("amount", 12, 2).notNullable();
         table.text("note").nullable();
+        table.date("date").notNullable();
         table.timestamps(true, true);
     });
 

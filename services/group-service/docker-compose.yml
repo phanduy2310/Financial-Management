@@ -1,0 +1,41 @@
+services:
+  group-service:
+    build: .
+    ports:
+      - "5002:5002"
+    env_file:
+      - .env.dev
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - group-network
+
+  mysql:
+    image: mysql:8
+    ports:
+      - "3308:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: financial_group
+      MYSQL_USER: finance_user
+      MYSQL_PASSWORD: finance_pass
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - group-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  group-network:
+    driver: bridge
+
+volumes:
+  mysql-data:

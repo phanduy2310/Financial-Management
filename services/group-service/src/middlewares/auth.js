@@ -45,5 +45,4 @@ function authorize(...roles) {
     };
 }
 
-module.exports = authorize;
-module.exports = authen;
+module.exports = { authen, authorize };

@@ -1,9 +1,11 @@
-const router = require("express").Router();
+const router = require("express").Router({ mergeParams: true });
 const c = require("../controllers/group_transaction");
+const {authen} = require("../middlewares/auth")
 
-router.post("/", c.createTransaction);
-router.get("/detail/:transaction_id", c.getTransactionDetail);
-router.get("/:group_id/summary", c.getSummary);
-router.get("/:group_id", c.getTransactions);
+router.post("/", authen, c.createTransaction);
+router.get("/", authen, c.getAllTransactions);
+router.get("/summary", authen, c.getSummary);
+router.get("/:transaction_id", authen, c.getTransactionDetail);
+
 
 module.exports = router;

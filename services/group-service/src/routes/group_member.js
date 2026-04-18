@@ -1,4 +1,4 @@
-const router = require("express").Router();
+const router = require("express").Router({ mergeParams: true });
 const c = require("../controllers/group_member");
 const {authen} = require("../middlewares/auth")
 
