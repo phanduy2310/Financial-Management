@@ -1,44 +1,5 @@
 # System Architecture
 
-> This document is completed **after** the Analysis and Design phase.
-> Analysis approach used: [Analysis and Design — DDD](analysis-and-design-ddd.md)
-
-**References:**
-1. *Service-Oriented Architecture: Analysis and Design for Services and Microservices* — Thomas Erl (2nd Edition)
-2. *Microservices Patterns: With Examples in Java* — Chris Richardson
-3. *Bài tập — Phát triển phần mềm hướng dịch vụ* — Hung Dang (available in Vietnamese)
-
----
-
-### How this document connects to Analysis & Design
-
-```
-┌─────────────────────────────────────────────────────┐
-│         Analysis & Design — DDD                     │
-│                                                     │
-│  Part 1: Domain Discovery                           │
-│  Part 2: Strategic DDD →                            │
-│    5 Bounded Contexts:                              │
-│    Identity, Finance, Wealth, Collaboration,        │
-│    Messaging                                        │
-│  Part 3: Service Contracts (API endpoints)          │
-└────────────────┬────────────────────────────────────┘
-                 │ inputs: 5 service candidates, NFRs,
-                 │         service contracts (API specs)
-                 ▼
-┌─────────────────────────────────────────────────────┐
-│         Architecture (this document)                │
-│                                                     │
-│  1. Pattern Selection                               │
-│  2. System Components (tech stack, ports)           │
-│  3. Communication Matrix                            │
-│  4. Architecture Diagram                            │
-│  5. Deployment                                      │
-└─────────────────────────────────────────────────────┘
-```
-
----
-
 ## 1. Pattern Selection
 
 | Pattern | Selected? | Business/Technical Justification |
@@ -160,4 +121,3 @@ docker compose up --build
 
 **Data persistence**: MySQL data lưu vào Docker volume `mysql-data`
 
-**Database initialization**: `mysql/init/01-create-databases.sql` tự động tạo 5 database khi MySQL khởi động lần đầu
