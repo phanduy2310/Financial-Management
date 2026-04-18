@@ -8,12 +8,11 @@ info:
 
 servers:
   - url: http://localhost:5444
-    description: Qua API Gateway (development)
-
+    description: Local Development
 paths:
   /health:
     get:
-      summary: Health check (gateway)
+      summary: Health check
       operationId: healthCheck
       responses:
         '200':
@@ -111,7 +110,7 @@ paths:
 
   /internal/publish:
     post:
-      summary: Publish event thông báo (internal — chỉ dùng giữa các service)
+      summary: Publish event thông báo
       operationId: publishNotification
       description: |
         Fire-and-forget endpoint dùng bởi auth-service, transaction-service, saving-service.

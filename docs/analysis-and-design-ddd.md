@@ -1,47 +1,4 @@
-# Analysis and Design — Domain-Driven Design Approach
-
-> **Goal**: Analyze a specific business process and design a service-oriented automation solution using Domain-Driven Design.
-> **Scope**: 4–6 week assignment — focus on **one business process**, not an entire system.
->
-> **Alternative to**: [`analysis-and-design.md`](analysis-and-design.md) (Step-by-Step Action approach).
-> Choose **one** approach, not both. Use this if your team prefers discovering service boundaries through **domain knowledge and business semantics** rather than action decomposition.
-
-**References:**
-1. *Domain-Driven Design: Tackling Complexity in the Heart of Software* — Eric Evans
-2. *Microservices Patterns: With Examples in Java* — Chris Richardson
-3. *Bài tập — Phát triển phần mềm hướng dịch vụ* — Hung Dang (available in Vietnamese)
-
----
-
-### How DDD differs from Step-by-Step Action
-
-| | Step-by-Step Action | DDD (this document) |
-|---|---|---|
-| **Thinking direction** | Bottom-up: actions → group → service | Top-down: domain → bounded context → service |
-| **Service boundary decided by** | Similarity of actions/functions | Semantic boundary of business domain |
-| **Best suited for** | Small–medium systems, simple logic | Complex business logic, ≥ 30 use cases |
-| **Key risk** | Services may be fragmented by technical logic | Requires deep domain understanding upfront |
-
-Both approaches lead to a list of services with clear responsibilities. DDD produces services aligned with *business boundaries* — changes in one business area only affect the corresponding service.
-
-### Progression Overview
-
-| Step | What you do | Output |
-|------|------------|--------|
-| **1.1** | Define the Business Process | Process diagram, actors, scope |
-| **1.2** | Survey existing systems | System inventory |
-| **1.3** | State non-functional requirements | NFR table |
-| **2.1** | Build a shared domain vocabulary | Ubiquitous Language glossary |
-| **2.2** | Discover Domain Events via Event Storming | Chronological event list |
-| **2.3** | Identify Commands and Actors | Command → Event mapping |
-| **2.4** | Form Aggregates from related Commands/Events | Aggregate table with owned data |
-| **2.5** | Draw Bounded Contexts around Aggregates | Bounded Context → service candidate |
-| **2.6** | Map relationships between Bounded Contexts | Context Map diagram + relationship table |
-| **2.7** | Design service interactions | Service composition diagram |
-| **3.1** | Specify service contracts | OpenAPI endpoint tables |
-| **3.2** | Design internal service logic | Flowchart per service |
-
----
+# Analysis and Design — Domain-Driven Design
 
 ## Part 1 — Domain Discovery
 
@@ -280,7 +237,7 @@ Full OpenAPI specs:
 | /api/auth/users/:id | GET | Lấy thông tin user theo ID | — | 200, 404 |
 | /api/parent/children | POST | Thêm con theo email (phụ huynh) | {email} | 200, 404 |
 | /api/parent/children | GET | Lấy danh sách con (phụ huynh) | — | 200 |
-| /api/parent/confirm | POST | Con xác nhận liên kết | {token} | 200 |
+| /api/parent/confirm | POST | Con xác nhận liên kết | {token, action} | 200 |
 
 **transaction-service — Finance Context:**
 
@@ -338,7 +295,7 @@ Full OpenAPI specs:
 | /api/groups/:id | PATCH | Cập nhật thông tin nhóm | {name, description} | 200, 404 |
 | /api/groups/:id | DELETE | Xóa nhóm | — | 200 |
 | /api/group-members/:group_id | GET | Lấy thành viên nhóm | — | 200 |
-| /api/group-members/add | POST | Thêm thành viên | {group_id, user_id} | 200, 409 |
+| /api/group-members/add | POST | Thêm thành viên | {group_id, user_id} | 200, 400 |
 | /api/group-members/remove | POST | Xóa thành viên | {group_id, user_id} | 200 |
 | /api/group-transactions | POST | Tạo giao dịch nhóm + chia tiền | {group_id, user_id, type, amount, shares} | 200 |
 | /api/group-transactions/:group_id | GET | Lấy giao dịch nhóm | — | 200 |
@@ -371,7 +328,7 @@ flowchart TD
     B -->|Invalid| C[Return 400]
     B -->|Valid| D[Insert to DB]
     D --> E[Publish TRANSACTION_CREATED to notification-service]
-    E --> F[Return 201 + transaction]
+    E --> F[Return 200 + transaction]
 ```
 
 **saving-service — Update saving plan progress flow:**
@@ -417,6 +374,6 @@ flowchart TD
     E -->|Có| F["Loop: tạo personal transaction cho từng share\n(POST /api/transactions)"]
     F -->|Error| G[Rollback — xóa personal transactions đã tạo]
     F -->|OK| H[Save shares vào DB]
-    E -->|Không| I[Return 201]
+    E -->|Không| I[Return 200]
     H --> I
 ```
