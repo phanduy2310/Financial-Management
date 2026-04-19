@@ -10,14 +10,17 @@ import {
 } from "recharts";
 
 export default function ProgressChart({ installments, plan }) {
-    // Dữ liệu biểu đồ: cộng dồn tiền góp
     let total = 0;
-    const data = installments
-        .map((i) => ({
-            date: new Date(i.payment_date).toLocaleDateString("vi-VN"),
-            amount: (total += Number(i.amount)),
-        }))
-        .reverse();
+    const data = [...installments]
+        .sort(
+            (a, b) =>
+                new Date(a.payment_date).getTime() -
+                new Date(b.payment_date).getTime()
+        )
+        .map((item) => ({
+            date: new Date(item.payment_date).toLocaleDateString("vi-VN"),
+            amount: (total += Number(item.amount)),
+        }));
 
     return (
         <div className="bg-white shadow rounded-xl p-4">
@@ -43,8 +46,8 @@ export default function ProgressChart({ installments, plan }) {
                 Tiến độ hiện tại:{" "}
                 <span className="font-semibold text-blue-600">
                     {plan.progress_percentage}% (
-                    {plan.current_amount.toLocaleString()}₫ /{" "}
-                    {plan.target_amount.toLocaleString()}₫)
+                    {Number(plan.current_amount || 0).toLocaleString()}đ /{" "}
+                    {Number(plan.target_amount || 0).toLocaleString()}đ)
                 </span>
             </p>
         </div>

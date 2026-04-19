@@ -5,6 +5,7 @@ const installmentController = require("../controllers/savingInstallment.controll
 
 router.post("/", controller.create);
 router.get("/all", controller.getAllPlans);
+router.get("/detail/:id", controller.getById);
 router.get("/:user_id/stats", controller.getStats);
 router.get("/:user_id/top", controller.getTopPlans);
 router.get("/:id/history", controller.getProgressHistory);

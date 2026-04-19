@@ -14,7 +14,7 @@ export default function SavingDetail() {
 
     const fetchData = async () => {
         try {
-            const planRes = await axios.get(`/saving/${id}`);
+            const planRes = await axios.get(`/saving/detail/${id}`);
             setPlan(planRes.data);
 
             const instRes = await axios.get(`/saving/${id}/installments`);

@@ -1,9 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const controller = require("../controllers/transaction");
-const auth = require("../middlewares/auth")
+const { auth, authOrInternal } = require("../middlewares/auth")
 
-router.post("/", auth, controller.create);
+router.post("/", authOrInternal, controller.create);
 
 router.get("/detail/:id", auth, controller.getTransactionDetail); 
 router.put("/:id", auth,  controller.updateTransaction);

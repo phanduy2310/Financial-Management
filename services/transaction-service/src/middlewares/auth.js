@@ -1,5 +1,39 @@
+const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const {error} = require("../utils/response");
+
+function hasMatchingInternalKey(providedKey, expectedKey) {
+    if (typeof providedKey !== "string" || typeof expectedKey !== "string") {
+        return false;
+    }
+
+    const providedBuffer = Buffer.from(providedKey);
+    const expectedBuffer = Buffer.from(expectedKey);
+
+    if (providedBuffer.length !== expectedBuffer.length) {
+        return false;
+    }
+
+    return crypto.timingSafeEqual(providedBuffer, expectedBuffer);
+}
+
+function resolveInternalUserId(req) {
+    const candidates = [
+        req.headers["x-user-id"],
+        req.body?.user_id,
+        req.query?.user_id,
+        req.params?.user_id,
+    ];
+
+    for (const candidate of candidates) {
+        const parsed = Number(candidate);
+        if (Number.isInteger(parsed) && parsed > 0) {
+            return parsed;
+        }
+    }
+
+    return null;
+}
 
 function auth(req, res, next) {
     try {
@@ -27,4 +61,34 @@ function auth(req, res, next) {
     }
 }
 
-module.exports = auth;
+function authOrInternal(req, res, next) {
+    const expectedKey = process.env.INTERNAL_API_KEY;
+    const providedKey = req.headers["x-internal-key"];
+
+    if (hasMatchingInternalKey(providedKey, expectedKey)) {
+        const userId = resolveInternalUserId(req);
+
+        if (!userId) {
+            return error(
+                res,
+                "internal request thieu user_id",
+                400,
+                "INVALID_INTERNAL_USER"
+            );
+        }
+
+        req.user = {
+            id: userId,
+            role: "internal",
+        };
+
+        return next();
+    }
+
+    return auth(req, res, next);
+}
+
+module.exports = {
+    auth,
+    authOrInternal,
+};
