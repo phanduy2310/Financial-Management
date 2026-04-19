@@ -19,7 +19,7 @@ export default function ExpenseDashboard() {
     // Fetch danh sách
     const fetchExpenses = async () => {
         try {
-            const res = await axios.get(`/transactions/${userId}`);
+            const res = await axios.get(`/transactions`);
             const list = res.data.data.filter((t) => t.type === "expense");
             setExpenses(list);
         } catch (err) {

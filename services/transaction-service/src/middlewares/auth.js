@@ -1,6 +1,6 @@
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
-const {error} = require("../utils/response");
+const { error } = require("../utils/response");
 
 function hasMatchingInternalKey(providedKey, expectedKey) {
     if (typeof providedKey !== "string" || typeof expectedKey !== "string") {
@@ -38,13 +38,15 @@ function resolveInternalUserId(req) {
 function auth(req, res, next) {
     try {
         const authHeader = req.headers.authorization;
+        console.log("authorization:", authHeader);
 
         if (!authHeader || !authHeader.startsWith("Bearer ")) {
             return error(res, "không có token", 401, "Unauthorized");
         }
 
         const token = authHeader.split(" ")[1];
-
+        console.log("token:", token);
+        
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         // hoặc dùng public key nếu auth-service ký bằng private key
 

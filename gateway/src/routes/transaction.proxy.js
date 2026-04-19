@@ -13,6 +13,7 @@ router.use(async (req, res) => {
       data: req.body,
       headers: {
         "Content-Type": "application/json",
+        Authorization: req.headers.authorization,
         host: undefined,
         connection: undefined,
       },

@@ -21,7 +21,7 @@ export default function IncomeDashboard() {
         if (!userId) return;
         setLoading(true);
         try {
-            const res = await axios.get(`/transactions/${userId}`);
+            const res = await axios.get(`/transactions`);
             const list = (res.data.data || []).filter(
                 (t) => t.type === "income"
             );

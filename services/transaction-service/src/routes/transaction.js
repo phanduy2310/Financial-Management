@@ -3,7 +3,7 @@ const router = express.Router();
 const controller = require("../controllers/transaction");
 const { auth, authOrInternal } = require("../middlewares/auth")
 
-router.post("/", authOrInternal, controller.create);
+router.post("/", auth, controller.create);
 
 router.get("/detail/:id", auth, controller.getTransactionDetail); 
 router.put("/:id", auth,  controller.updateTransaction);
