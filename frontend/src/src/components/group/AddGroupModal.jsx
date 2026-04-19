@@ -1,36 +1,26 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { X } from "lucide-react";
 import axios from "../../api/axios";
-import { useUserId } from "../../hooks/useUserId";
 
 export default function AddGroupModal({ onClose, refresh }) {
-    const userId = useUserId();
-    const [form, setForm] = useState({
-        name: "",
-        description: "",
-        owner_id: userId,
-    });
-
-    useEffect(() => {
-        if (userId) {
-            setForm((prev) => ({ ...prev, owner_id: userId }));
-        }
-    }, [userId]);
+    const [form, setForm] = useState({ name: "", description: "" });
 
     const handleChange = (e) => {
         setForm({ ...form, [e.target.name]: e.target.value });
     };
 
     const handleSubmit = async () => {
+        if (!form.name.trim()) {
+            alert("Vui lòng nhập tên nhóm!");
+            return;
+        }
         try {
-            await axios.post("/groups", {
-                ...form,
-                owner_id: userId,
-            });
+            await axios.post("/groups", form);
             refresh();
             onClose();
         } catch (err) {
             console.error("Create group error:", err);
+            alert(err.response?.data?.message || "Không thể tạo nhóm!");
         }
     };
 

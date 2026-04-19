@@ -44,13 +44,18 @@ export default function GroupDetail() {
     const refreshAll = useCallback(async () => {
         try {
             const [memRes, transRes, sumRes] = await Promise.all([
-                axios.get(`/group-members/${groupId}`),
-                axios.get(`/group-transactions/${groupId}`),
-                axios.get(`/group-transactions/${groupId}/summary`),
+                axios.get(`/groups/${groupId}/members`),
+                axios.get(`/groups/${groupId}/transactions`),
+                axios.get(`/groups/${groupId}/transactions/summary`),
             ]);
-            setMembers(memRes.data.data || memRes.data);
-            setTransactions(transRes.data.data || transRes.data);
-            setSummary(sumRes.data.data || sumRes.data);
+            setMembers(memRes.data.data || []);
+            setTransactions(transRes.data.data || []);
+            const s = sumRes.data.data || {};
+            setSummary({
+                income: s.total_income ?? 0,
+                expense: s.total_expense ?? 0,
+                balance: s.closing_balance ?? 0,
+            });
         } catch (err) {
             console.error("Error refreshing group data:", err);
         }
@@ -158,13 +163,13 @@ export default function GroupDetail() {
                                 >
                                     <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 bg-red-900 text-white rounded-xl flex items-center justify-center font-black text-sm shadow-md">
-                                            {m.user?.fullname
+                                            {(m.fullname || m.user?.fullname)
                                                 ?.charAt(0)
                                                 .toUpperCase() || "U"}
                                         </div>
                                         <div>
                                             <p className="font-black text-slate-800 text-sm leading-none uppercase">
-                                                {m.user?.fullname || "PTITer"}
+                                                {m.fullname || m.user?.fullname || "PTITer"}
                                             </p>
                                             <span
                                                 className={`text-[9px] font-black uppercase tracking-tighter ${
@@ -257,6 +262,7 @@ export default function GroupDetail() {
             )}
             {openDetailModal && (
                 <TransactionDetailModal
+                    groupId={groupId}
                     transactionId={selectedTransactionId}
                     onClose={() => setOpenDetailModal(false)}
                 />

@@ -17,7 +17,7 @@ export default function ManageMemberModal({
         try {
             setLoading(true);
 
-            // 1. Tìm user theo email
+            // 1. Tìm user theo email qua auth service
             const res = await axios.get(`/auth/users/find`, {
                 params: { email },
             });
@@ -28,9 +28,8 @@ export default function ManageMemberModal({
                 return;
             }
 
-            // 2. Gọi API add member
-            await axios.post("/group-members/add", {
-                group_id: groupId,
+            // 2. POST /groups/:group_id/members theo spec
+            await axios.post(`/groups/${groupId}/members`, {
                 user_id: user.id,
             });
 
@@ -38,7 +37,9 @@ export default function ManageMemberModal({
             setEmail("");
         } catch (err) {
             console.error("Add member error:", err);
-            alert("Không thể thêm thành viên.");
+            const msg = err.response?.data?.message;
+            if (err.response?.status === 409) alert("Người dùng đã là thành viên nhóm.");
+            else alert(msg || "Không thể thêm thành viên.");
         } finally {
             setLoading(false);
         }
@@ -48,13 +49,12 @@ export default function ManageMemberModal({
         if (!window.confirm("Xoá thành viên này khỏi nhóm?")) return;
 
         try {
-            await axios.post("/group-members/remove", {
-                group_id: groupId,
-                user_id: userId,
-            });
+            // DELETE /groups/:group_id/members/:user_id theo spec
+            await axios.delete(`/groups/${groupId}/members/${userId}`);
             refresh();
         } catch (err) {
             console.error("Remove member error:", err);
+            alert(err.response?.data?.message || "Không thể xoá thành viên.");
         }
     };
 
@@ -84,16 +84,12 @@ export default function ManageMemberModal({
                             <div className="flex items-center gap-3 text-sm">
                                 {/* Avatar */}
                                 <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-700 text-xs font-semibold">
-                                    {m.user?.fullname
-                                        ? m.user.fullname
-                                              .charAt(0)
-                                              .toUpperCase()
-                                        : "?"}
+                                    {(m.fullname || m.user?.fullname)?.charAt(0).toUpperCase() ?? "?"}
                                 </div>
 
                                 {/* Fullname */}
                                 <span className="font-medium text-gray-800">
-                                    {m.user?.fullname || `User #${m.user_id}`}
+                                    {m.fullname || m.user?.fullname || `User #${m.user_id}`}
                                 </span>
 
                                 {/* Role Badge */}

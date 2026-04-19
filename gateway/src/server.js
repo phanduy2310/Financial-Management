@@ -36,8 +36,6 @@ app.use("/api/saving", savingProxy);
 app.use("/api/installment", savingProxy);
 app.use("/api/notification", notificationProxy);
 app.use("/api/groups", groupProxy);
-app.use("/api/group-members", groupProxy);
-app.use("/api/group-transactions", groupProxy);
 
 const PORT = process.env.PORT || 5444;
 app.listen(PORT, () => console.log(`🚀 API Gateway running on port ${PORT}`));

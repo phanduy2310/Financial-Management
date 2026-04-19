@@ -29,17 +29,17 @@ export default function AddExpenseModal({ isOpen, onClose, onSuccess }) {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            console.log("Payload khoản chi:", form);
             await axios.post("/transactions", {
-                ...form,
-                user_id: userId,
+                type: "expense",
+                category: form.category,
                 amount: Number(form.amount),
+                date: form.date,
+                note: form.note,
             });
             alert("Tạo khoản chi thành công!");
             onSuccess?.();
             onClose();
             setForm({
-                user_id: userId,
                 type: "expense",
                 category: "",
                 amount: "",

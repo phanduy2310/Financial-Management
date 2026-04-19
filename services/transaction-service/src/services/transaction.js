@@ -110,8 +110,8 @@ class TransactionService {
                 `date >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL ? MONTH)`,
                 [months - 1]
             )
-            .selectRaw("YEAR(date) as year")
-            .selectRaw("MONTH(date) as month")
+            .select(Transaction.raw("YEAR(date) as year"))
+            .select(Transaction.raw("MONTH(date) as month"))
             .select("type")
             .sum("amount as total")
             .groupByRaw("YEAR(date), MONTH(date), type")

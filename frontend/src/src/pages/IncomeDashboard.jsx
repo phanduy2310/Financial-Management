@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import axios from "../api/axios";
-import { Plus, Wallet, Search, ArrowUpCircle, History } from "lucide-react";
+import { Plus, Wallet, Search, History } from "lucide-react";
 import IncomeTable from "../components/Income/IncomeTable";
 import FilterBar from "../components/Income/FilterBar";
 import IncomeSummaryCard from "../components/Income/IncomeSummaryCard";
 import AddIncomeModal from "../components/modals/AddIncomeModal";
 import EditIncomeModal from "../components/modals/EditIncomeModal";
+import MonthPicker from "../components/ui/MonthPicker";
 import { useUserId } from "../hooks/useUserId";
 
 export default function IncomeDashboard() {
@@ -17,21 +18,28 @@ export default function IncomeDashboard() {
     const [selectedIncome, setSelectedIncome] = useState(null);
     const [loading, setLoading] = useState(true);
 
+    const now = new Date();
+    const [month, setMonth] = useState(now.getMonth() + 1);
+    const [year, setYear] = useState(now.getFullYear());
+
+    const handleMonthChange = ({ month: m, year: y }) => {
+        setMonth(m);
+        setYear(y);
+    };
+
     const fetchIncomes = useCallback(async () => {
         if (!userId) return;
         setLoading(true);
         try {
-            const res = await axios.get(`/transactions`);
-            const list = (res.data.data || []).filter(
-                (t) => t.type === "income"
-            );
+            const res = await axios.get(`/transactions?month=${month}&year=${year}`);
+            const list = (res.data.data || []).filter((t) => t.type === "income");
             setIncomes(list);
         } catch (err) {
             console.error("Error fetching incomes:", err);
         } finally {
             setLoading(false);
         }
-    }, [userId]);
+    }, [userId, month, year]);
 
     useEffect(() => {
         fetchIncomes();
@@ -39,30 +47,26 @@ export default function IncomeDashboard() {
 
     const filteredIncomes = useMemo(() => {
         return incomes.filter((i) => {
-            const matchCategory =
-                filter.category === "all" || i.category === filter.category;
+            const matchCategory = filter.category === "all" || i.category === filter.category;
             const keyword = filter.keyword.toLowerCase();
-            return (
+            const matchKeyword =
                 i.note?.toLowerCase().includes(keyword) ||
-                i.category?.toLowerCase().includes(keyword)
-            );
+                i.category?.toLowerCase().includes(keyword);
+            return matchCategory && matchKeyword;
         });
     }, [incomes, filter]);
 
-    const totalIncome = useMemo(() => {
-        return filteredIncomes.reduce(
-            (sum, i) => sum + Number(i.amount || 0),
-            0
-        );
-    }, [filteredIncomes]);
+    const totalIncome = useMemo(
+        () => filteredIncomes.reduce((sum, i) => sum + Number(i.amount || 0), 0),
+        [filteredIncomes]
+    );
 
     const handleDelete = async (income) => {
-        if (!window.confirm(`Xóa thu nhập: ${income.note || income.category}?`))
-            return;
+        if (!window.confirm(`Xóa thu nhập: ${income.note || income.category}?`)) return;
         try {
             await axios.delete(`/transactions/${income.id}`);
             fetchIncomes();
-        } catch (err) {
+        } catch {
             alert("Không thể xóa!");
         }
     };
@@ -75,10 +79,9 @@ export default function IncomeDashboard() {
     return (
         <div className="min-h-screen bg-[#FCFCFD] px-4 py-4 md:px-8 md:py-6">
             <div className="max-w-7xl mx-auto space-y-6">
-                {/* --- HEADER SECTION --- */}
+                {/* --- HEADER --- */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white px-8 py-5 rounded-[2rem] border border-slate-100 shadow-sm">
                     <div className="flex items-center gap-4">
-                        {/* Icon Wallet với màu đỏ Bách Khoa */}
                         <div className="p-3 bg-red-50 text-red-700 rounded-2xl">
                             <Wallet size={28} strokeWidth={2.5} />
                         </div>
@@ -90,18 +93,21 @@ export default function IncomeDashboard() {
                                 <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
                                 {loading
                                     ? "Đang đồng bộ..."
-                                    : `${incomes.length} Giao dịch hệ thống`}
+                                    : `${incomes.length} giao dịch tháng này`}
                             </p>
                         </div>
                     </div>
 
-                    <button
-                        onClick={() => setOpenAdd(true)}
-                        className="flex items-center gap-2 bg-red-700 hover:bg-red-800 text-white font-bold px-6 py-3 rounded-2xl shadow-lg shadow-red-700/20 transition-all active:scale-95 text-sm"
-                    >
-                        <Plus size={20} strokeWidth={3} />
-                        Thêm thu nhập
-                    </button>
+                    <div className="flex items-center gap-3 flex-wrap">
+                        <MonthPicker month={month} year={year} onChange={handleMonthChange} />
+                        <button
+                            onClick={() => setOpenAdd(true)}
+                            className="flex items-center gap-2 bg-red-700 hover:bg-red-800 text-white font-bold px-6 py-3 rounded-2xl shadow-lg shadow-red-700/20 transition-all active:scale-95 text-sm"
+                        >
+                            <Plus size={20} strokeWidth={3} />
+                            Thêm thu nhập
+                        </button>
+                    </div>
                 </div>
 
                 {/* --- SUMMARY & FILTER --- */}
@@ -109,13 +115,12 @@ export default function IncomeDashboard() {
                     <div className="lg:col-span-1">
                         <IncomeSummaryCard totalIncome={totalIncome} />
                     </div>
-
                     <div className="lg:col-span-3">
                         <FilterBar filter={filter} setFilter={setFilter} />
                     </div>
                 </div>
 
-                {/* --- TABLE SECTION --- */}
+                {/* --- TABLE --- */}
                 <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
                     <div className="px-8 py-5 border-b border-slate-50 flex items-center justify-between bg-slate-50/30">
                         <h2 className="text-sm font-black text-slate-800 flex items-center gap-2 uppercase tracking-widest">
@@ -145,10 +150,7 @@ export default function IncomeDashboard() {
                         ) : filteredIncomes.length === 0 ? (
                             <div className="text-center py-20">
                                 <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <Search
-                                        size={32}
-                                        className="text-slate-200"
-                                    />
+                                    <Search size={32} className="text-slate-200" />
                                 </div>
                                 <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">
                                     Không có dữ liệu trùng khớp

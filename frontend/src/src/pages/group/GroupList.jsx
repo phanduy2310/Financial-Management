@@ -17,8 +17,8 @@ export default function GroupList() {
     const fetchGroups = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await axios.get(`/groups/user/${userId}`);
-            setGroups(res.data.data || res.data);
+            const res = await axios.get(`/groups/my-groups`);
+            setGroups(res.data.data || []);
         } catch (err) {
             console.error("Load groups error:", err);
         } finally {

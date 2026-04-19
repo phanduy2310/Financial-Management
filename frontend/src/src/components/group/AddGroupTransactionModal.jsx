@@ -16,6 +16,7 @@ export default function AddGroupTransactionModal({
         category: "",
         amount: "",
         note: "",
+        date: new Date().toISOString().split("T")[0],
     });
 
     const [splitMode, setSplitMode] = useState("equal"); // 'equal' | 'custom'
@@ -69,21 +70,21 @@ export default function AddGroupTransactionModal({
 
     const handleSubmit = async () => {
         const payload = {
-            group_id: Number(groupId),
-            user_id: currentUserId,
             type: form.type,
             category: form.category,
             amount: Number(form.amount),
             note: form.note,
-            shares: buildSharesPayload(), // TODO: backend xử lý thêm
+            date: new Date().toISOString().split("T")[0],
+            shares: buildSharesPayload(),
         };
 
         try {
-            await axios.post("/group-transactions", payload);
+            await axios.post(`/groups/${groupId}/transactions`, payload);
             refresh();
             onClose();
         } catch (err) {
             console.error("Create group transaction error:", err);
+            alert(err.response?.data?.message || "Không thể tạo giao dịch!");
         }
     };
 
@@ -156,6 +157,14 @@ export default function AddGroupTransactionModal({
                         className="w-full border rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none"
                         onChange={handleChange}
                     />
+
+                    <input
+                        name="date"
+                        type="date"
+                        value={form.date}
+                        className="w-full border rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                        onChange={handleChange}
+                    />
                 </div>
 
                 {/* Split Bill */}
@@ -193,7 +202,7 @@ export default function AddGroupTransactionModal({
                                             }
                                             className="rounded"
                                         />
-                                        <span>{m.user?.fullname || `User #${m.user_id}`}</span>
+                                        <span>{m.fullname || m.user?.fullname || `User #${m.user_id}`}</span>
                                         {m.role === "owner" && (
                                             <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-700">
                                                 Chủ nhóm

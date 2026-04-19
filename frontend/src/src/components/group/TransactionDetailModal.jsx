@@ -2,18 +2,13 @@ import React, { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import axios from "../../api/axios";
 
-export default function TransactionDetailModal({ transactionId, onClose }) {
+export default function TransactionDetailModal({ groupId, transactionId, onClose }) {
     const [loading, setLoading] = useState(true);
     const [transaction, setTransaction] = useState(null);
     const [shares, setShares] = useState([]);
 
     const fetchDetail = async () => {
-        if (
-            !transactionId ||
-            transactionId === "undefined" ||
-            transactionId === "null"
-        )
-            return setLoading(false);
+        if (!transactionId || !groupId) return setLoading(false);
 
         const id = Number(transactionId);
         if (isNaN(id) || id <= 0) {
@@ -22,22 +17,21 @@ export default function TransactionDetailModal({ transactionId, onClose }) {
         }
 
         try {
-            const res = await axios.get(`/group-transactions/detail/${id}`);
-            setTransaction(res.data.data?.transaction || res.data.transaction);
-            setShares(res.data.data?.shares || res.data.shares);
+            // GET /groups/:group_id/transactions/:transaction_id theo spec
+            const res = await axios.get(`/groups/${groupId}/transactions/${id}`);
+            setTransaction(res.data.data?.transaction || null);
+            setShares(res.data.data?.shares || []);
         } catch (err) {
             console.error("Error loading transaction detail:", err);
-            alert(
-                err.response?.data?.error || "Không thể tải chi tiết giao dịch"
-            );
+            alert(err.response?.data?.message || "Không thể tải chi tiết giao dịch");
         }
 
         setLoading(false);
     };
 
     useEffect(() => {
-        if (transactionId) fetchDetail();
-    }, [transactionId]);
+        if (transactionId && groupId) fetchDetail();
+    }, [transactionId, groupId]);
 
     if (loading || !transaction)
         return (

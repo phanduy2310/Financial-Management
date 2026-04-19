@@ -113,6 +113,12 @@ htmlcov/
 test-results/
 
 # ==============================
+# AI Tools
+# ==============================
+.kiro/
+.agent-skills/
+
+# ==============================
 # Ignored Services
 # ==============================
 services/category-service/

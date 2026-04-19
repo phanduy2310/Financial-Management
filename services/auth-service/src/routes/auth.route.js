@@ -11,8 +11,12 @@ router.post("/register", auth.register);
 router.post("/login", auth.login);
 router.post("/refresh", auth.refreshToken);
 router.post("/logout", auth.logout);
+
+// /users/find dùng JWT — client gọi để tìm user theo email khi add member vào nhóm
+router.get("/users/find", authenticate, auth.findByEmail);
+
+// Các route /users còn lại chỉ dành cho internal service calls
 router.use("/users", requireInternalKey);
-router.get("/users/find", auth.findByEmail);
 router.post("/users/bulk", auth.getUsersBulk);
 router.get("/users/:id", auth.getUserById);
 

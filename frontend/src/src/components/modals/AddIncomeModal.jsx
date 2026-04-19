@@ -29,17 +29,17 @@ export default function AddIncomeModal({ isOpen, onClose, onSuccess }) {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            console.log("Payload khoản thu:", form);
             await axios.post("/transactions", {
-                ...form,
-                user_id: userId,
+                type: "income",
+                category: form.category,
                 amount: Number(form.amount),
+                date: form.date,
+                note: form.note,
             });
             alert("Tạo khoản thu thành công!");
             onSuccess?.();
             onClose();
             setForm({
-                user_id: userId,
                 type: "income",
                 category: "",
                 amount: "",
