@@ -57,6 +57,21 @@ exports.getAllByUser = async (req, res) => {
     }
 };
 
+exports.getById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const plan = await SavingPlan.query().findById(id);
+
+        if (!plan) {
+            return res.status(404).json({ message: "Khong tim thay ke hoach" });
+        }
+
+        return res.json(plan);
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+};
+
 exports.updateProgress = async (req, res) => {
     try {
         const { id } = req.params;

@@ -18,6 +18,7 @@ import ExpenseDashboard from "./pages/ExpenseDashboard";
 // Saving
 import SavingDashboard from "./pages/SavingDashboard";
 import SavingList from "./pages/saving/SavingList";
+import SavingDetail from "./pages/saving/SavingDetail";
 
 // Installments
 import InstallmentDashboard from "./pages/InstallmentDashboard";
@@ -77,6 +78,7 @@ export default function App() {
                     {/* Saving */}
                     <Route path="saving" element={<SavingDashboard />} />
                     <Route path="saving/list" element={<SavingList />} />
+                    <Route path="saving/:id" element={<SavingDetail />} />
 
                     {/* Installments */}
                     <Route
