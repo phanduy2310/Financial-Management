@@ -19,10 +19,10 @@ const {
 const { serializeUser, serializeUsers } = require("../utils/user");
 
 const registerSchema = Joi.object({
-    fullname: Joi.string().min(3).required(),
-    email: Joi.string().email().required(),
+    fullname: Joi.string().trim().min(3).required(),
+    email: Joi.string().trim().lowercase().email().required(),
     password: Joi.string().min(6).required(),
-    role: Joi.any().forbidden(),
+    role: Joi.string().valid("user", "parent").default("user"),
 });
 
 const loginSchema = Joi.object({
@@ -41,7 +41,10 @@ function buildAuthPayload(user) {
 
 exports.register = async (req, res) => {
     try {
-        const { error } = registerSchema.validate(req.body);
+        const { error, value } = registerSchema.validate(req.body, {
+            abortEarly: false,
+            stripUnknown: true,
+        });
         if (error) {
             return res.status(400).json({
                 message: "Du lieu khong hop le",
@@ -49,7 +52,7 @@ exports.register = async (req, res) => {
             });
         }
 
-        const { fullname, email, password } = req.body;
+        const { fullname, email, password, role } = value;
 
         const existingUser = await User.query().findOne({ email });
         if (existingUser) {
@@ -61,7 +64,7 @@ exports.register = async (req, res) => {
             fullname,
             email,
             password: hashedPassword,
-            role: "user",
+            role,
         });
 
         return res.status(201).json({

@@ -1,125 +1,163 @@
-# Docker Compose — Multi-container orchestration
-# Run: docker compose up --build
-# Docs: https://docs.docker.com/compose/
-
 services:
-  # ─── Frontend ────────────────────────────────────
+  # ===========================
+  # MYSQL
+  # ===========================
+  mysql:
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - app-network
+
+  # ===========================
+  # AUTH SERVICE
+  # ===========================
+  auth-service:
+    build: ./services/auth-service
+    restart: always
+    env_file:
+      - ./services/auth-service/.env.dev
+    command: sh -c "npx knex migrate:latest && node server.js"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  # ===========================
+  # TRANSACTION SERVICE
+  # ===========================
+  transaction-service:
+    build: ./services/transaction-service
+    restart: always
+    env_file:
+      - ./services/transaction-service/.env.dev
+    command: sh -c "npm run migrate:latest && node server.js"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8082/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  # ===========================
+  # SAVING SERVICE
+  # ===========================
+  saving-service:
+    build: ./services/saving-service
+    restart: always
+    env_file:
+      - ./services/saving-service/.env.dev
+    command: sh -c "npx knex migrate:latest && node server.js"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8083/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  # ===========================
+  # NOTIFICATION SERVICE
+  # ===========================
+  notification-service:
+    build: ./services/notification-service
+    restart: always
+    env_file:
+      - ./services/notification-service/.env.dev
+    command: sh -c "npx knex migrate:latest && node server.js"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8084/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  # ===========================
+  # GROUP SERVICE
+  # ===========================
+  group-service:
+    build: ./services/group-service
+    restart: always
+    env_file:
+      - ./services/group-service/.env.dev
+    command: sh -c "npm run migrate:latest && node server.js"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8085/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  # ===========================
+  # API GATEWAY
+  # ===========================
+  gateway:
+    build: ./gateway
+    restart: always
+    env_file:
+      - ./gateway/src/.env
+    ports:
+      - "${GATEWAY_PORT:-5444}:5444"
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      transaction-service:
+        condition: service_healthy
+      saving-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+      group-service:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  # ===========================
+  # FRONTEND
+  # ===========================
   frontend:
     build: ./frontend
+    restart: always
     ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+      - "${FRONTEND_PORT:-5000}:3000"
     depends_on:
       - gateway
     networks:
       - app-network
 
-  # ─── API Gateway ─────────────────────────────────
-  gateway:
-    build: ./gateway
-    ports:
-      - "${GATEWAY_PORT:-8080}:8000"
-    depends_on:
-      - service-a
-      - service-b
-    networks:
-      - app-network
-
-  # ─── Service A ───────────────────────────────────
-  service-a:
-    build: ./services/service-a
-    ports:
-      - "${SERVICE_A_PORT:-5001}:5000"
-    env_file:
-      - .env
-    networks:
-      - app-network
-    # healthcheck:
-    #   test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
-    #   interval: 30s
-    #   timeout: 10s
-    #   retries: 3
-
-  # ─── Service B ───────────────────────────────────
-  service-b:
-    build: ./services/service-b
-    ports:
-      - "${SERVICE_B_PORT:-5002}:5000"
-    env_file:
-      - .env
-    networks:
-      - app-network
-
-  # ─── Transaction Service ─────────────────────────
-  transaction-service:
-    build: ./services/transaction-service
-    ports:
-      - "5001:5001"
-    environment:
-      MYSQL_HOST: mysql
-      MYSQL_USER: finance_user
-      MYSQL_PASSWORD: finance_pass
-      MYSQL_DATABASE: financial_transaction
-      PORT: 5001
-    depends_on:
-      mysql:
-        condition: service_healthy
-    networks:
-      - app-network
-
-  # ─── MySQL ───────────────────────────────────────
-  mysql:
-    image: mysql:8
-    ports:
-      - "3306:3306"
-    environment:
-      MYSQL_ROOT_PASSWORD: rootpass
-      MYSQL_DATABASE: financial_transaction
-      MYSQL_USER: finance_user
-      MYSQL_PASSWORD: finance_pass
-    volumes:
-      - mysql-data:/var/lib/mysql
-    networks:
-      - app-network
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # ─── Shared Infrastructure (uncomment as needed) ─
-  # db:
-  #   image: postgres:16-alpine    # or mysql:8, mongo:7, etc.
-  #   ports:
-  #     - "${DB_PORT:-5432}:5432"
-  #   environment:
-  #     POSTGRES_DB: ${DB_NAME:-mydb}
-  #     POSTGRES_USER: ${DB_USER:-admin}
-  #     POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
-  #   volumes:
-  #     - db-data:/var/lib/postgresql/data
-  #   networks:
-  #     - app-network
-
-  # redis:
-  #   image: redis:7-alpine
-  #   ports:
-  #     - "6379:6379"
-  #   networks:
-  #     - app-network
-
-  # rabbitmq:
-  #   image: rabbitmq:3-management-alpine
-  #   ports:
-  #     - "5672:5672"
-  #     - "15672:15672"
-  #   networks:
-  #     - app-network
-
 networks:
   app-network:
     driver: bridge
 
-# volumes:
-#   db-data:
 volumes:
   mysql-data:

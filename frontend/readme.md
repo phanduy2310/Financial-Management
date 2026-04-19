@@ -1,17 +1,12 @@
-# Frontend
+# Frontend — PTIT-Financial
 
-## Overview
-
-This is the frontend module of the microservices system. It provides the user interface and communicates with backend services through the API Gateway.
+React SPA quản lý tài chính cá nhân. Giao tiếp hoàn toàn qua API Gateway.
 
 ## Tech Stack
+- React 19, React Router, TailwindCSS, Recharts, Framer Motion
 
-| Component        | Choice               |
-|------------------|----------------------|
-| Framework        | *(e.g., React, Vue, Angular, Svelte, plain HTML/JS)* |
-| Styling          | *(e.g., CSS, Tailwind, Bootstrap, Material UI)*       |
-| Package Manager  | *(e.g., npm, yarn, pnpm)*                             |
-| Build Tool       | *(e.g., Vite, Webpack, esbuild)*                      |
+## Port
+- `5000` (host) → `3000` (container via nginx)
 
 ## Getting Started
 
@@ -19,36 +14,20 @@ This is the frontend module of the microservices system. It provides the user in
 # From project root
 docker compose up frontend --build
 
-# Or run locally (adapt to your stack)
+# Or run locally
 cd src/
-# npm install && npm run dev
-# yarn && yarn dev
-```
-
-## Project Structure
-
-```
-frontend/
-├── Dockerfile
-├── readme.md
-└── src/           # Your source code goes here
+npm install
+npm start
 ```
 
 ## Environment Variables
 
-| Variable       | Description                | Default                  |
-|----------------|----------------------------|--------------------------|
-| `API_BASE_URL` | URL of the API Gateway     | `http://localhost:8080`  |
-
-## Build for Production
-
-```bash
-# Example:
-# npm run build
-# yarn build
-```
+| Variable                     | Description            | Default                      |
+|------------------------------|------------------------|------------------------------|
+| `REACT_APP_API_BASE_URL`     | URL API Gateway        | `http://localhost:5444/api`  |
+| `REACT_APP_GATEWAY_URL`      | URL Gateway (SSE)      | `http://localhost:5444`      |
 
 ## Notes
 
-- All API calls should go through the **API Gateway** (`gateway`), not directly to individual services.
-- Configure proxy or API base URL to point to the gateway.
+- Mọi API call đi qua **Gateway** tại `http://localhost:5444`
+- Build production bằng nginx, phục vụ qua port 3000 trong container
