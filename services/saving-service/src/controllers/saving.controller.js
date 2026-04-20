@@ -76,7 +76,11 @@ exports.updateProgress = async (req, res) => {
     try {
         const { id } = req.params;
         const { current_amount } = validateSavingProgressInput(req.body);
-        const updated = await updateSavingPlanProgress({ id, current_amount });
+        const updated = await updateSavingPlanProgress({
+            id,
+            current_amount,
+            authToken: req.headers.authorization,
+        });
 
         res.json({
             message: "Cập nhật tiến độ thành công",
@@ -90,7 +94,10 @@ exports.updateProgress = async (req, res) => {
 exports.markCompleted = async (req, res) => {
     try {
         const { id } = req.params;
-        const updated = await markSavingPlanCompleted({ id });
+        const updated = await markSavingPlanCompleted({
+            id,
+            authToken: req.headers.authorization,
+        });
 
         return res.json({
             message: "Đã đánh dấu hoàn thành kế hoạch",
@@ -111,7 +118,11 @@ exports.updateInfo = async (req, res) => {
         }
 
         const fields = validateSavingUpdateInput(req.body, currentPlan);
-        const updated = await updateSavingPlanInfo({ id, fields });
+        const updated = await updateSavingPlanInfo({
+            id,
+            fields,
+            authToken: req.headers.authorization,
+        });
 
         res.json({
             message: "Cập nhật thông tin kế hoạch thành công",

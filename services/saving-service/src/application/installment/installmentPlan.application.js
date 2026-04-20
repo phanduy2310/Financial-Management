@@ -22,7 +22,7 @@ async function createInstallmentPlan(input) {
     return InstallmentPlan.query().insert(aggregate.toPersistence());
 }
 
-async function payInstallment({ id }) {
+async function payInstallment({ id, authToken }) {
     let updated;
     let responseMessage;
     let notificationPayload = null;
@@ -45,7 +45,10 @@ async function payInstallment({ id }) {
                 actualPaymentAmount
             );
             console.log("[TRANSACTION SERVICE] Gửi payload:", transactionPayload);
-            await transactionClient.post("/api/transactions", transactionPayload);
+            await transactionClient.withAuth(authToken).post(
+                "/api/transactions",
+                transactionPayload
+            );
         } catch (err) {
             console.error("[TRANSACTION SERVICE ERROR]", {
                 message: err.message,

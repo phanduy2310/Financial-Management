@@ -23,13 +23,13 @@ async function createSavingPlan(input) {
     return SavingPlan.query().insert(aggregate.toPersistence());
 }
 
-async function handleCompletionIfNeeded(aggregate, justCompleted, errorMessage) {
+async function handleCompletionIfNeeded(aggregate, justCompleted, errorMessage, authToken) {
     if (!justCompleted) {
         return null;
     }
 
     try {
-        await transactionClient.post(
+        await transactionClient.withAuth(authToken).post(
             "/api/transactions",
             aggregate.buildCompletionTransactionPayload()
         );
@@ -45,7 +45,7 @@ async function handleCompletionIfNeeded(aggregate, justCompleted, errorMessage) 
     return aggregate.buildCompletionNotificationPayload();
 }
 
-async function updateSavingPlanProgress({ id, current_amount }) {
+async function updateSavingPlanProgress({ id, current_amount, authToken }) {
     let updated;
     let notificationPayload = null;
 
@@ -60,7 +60,8 @@ async function updateSavingPlanProgress({ id, current_amount }) {
         notificationPayload = await handleCompletionIfNeeded(
             aggregate,
             justCompleted,
-            "Cập nhật tiến độ nhưng tạo transaction thất bại"
+            "Cập nhật tiến độ nhưng tạo transaction thất bại",
+            authToken
         );
         updated = await SavingPlan.query(trx).patchAndFetchById(id, {
             current_amount: aggregate.current_amount,
@@ -73,7 +74,7 @@ async function updateSavingPlanProgress({ id, current_amount }) {
     return updated;
 }
 
-async function markSavingPlanCompleted({ id }) {
+async function markSavingPlanCompleted({ id, authToken }) {
     let updated;
     let notificationPayload = null;
 
@@ -88,7 +89,8 @@ async function markSavingPlanCompleted({ id }) {
         notificationPayload = await handleCompletionIfNeeded(
             aggregate,
             justCompleted,
-            "Hoàn thành kế hoạch nhưng tạo transaction thất bại"
+            "Hoàn thành kế hoạch nhưng tạo transaction thất bại",
+            authToken
         );
         updated = await SavingPlan.query(trx).patchAndFetchById(id, {
             current_amount: aggregate.current_amount,
@@ -101,7 +103,7 @@ async function markSavingPlanCompleted({ id }) {
     return updated;
 }
 
-async function updateSavingPlanInfo({ id, fields }) {
+async function updateSavingPlanInfo({ id, fields, authToken }) {
     let updated;
     let notificationPayload = null;
 
@@ -116,7 +118,8 @@ async function updateSavingPlanInfo({ id, fields }) {
         notificationPayload = await handleCompletionIfNeeded(
             aggregate,
             justCompleted,
-            "Cap nhat thong tin ke hoach nhung tao transaction that bai"
+            "Cap nhat thong tin ke hoach nhung tao transaction that bai",
+            authToken
         );
         updated = await SavingPlan.query(trx).patchAndFetchById(id, {
             title: aggregate.title,
@@ -145,6 +148,7 @@ async function addSavingInstallment({
     amount,
     note,
     payment_date,
+    authToken,
 }) {
     let installment;
     let updatedPlan;
@@ -175,7 +179,8 @@ async function addSavingInstallment({
         notificationPayload = await handleCompletionIfNeeded(
             aggregate,
             justCompleted,
-            "Thêm khoản tiết kiệm nhưng tạo transaction thất bại"
+            "Thêm khoản tiết kiệm nhưng tạo transaction thất bại",
+            authToken
         );
         updatedPlan = await SavingPlan.query(trx).patchAndFetchById(saving_plan_id, {
             current_amount: aggregate.current_amount,

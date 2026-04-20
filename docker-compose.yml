@@ -51,7 +51,7 @@ services:
       mysql:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:5001/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8082/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -111,7 +111,7 @@ services:
       mysql:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:5002/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8085/health"]
       interval: 10s
       timeout: 5s
       retries: 5

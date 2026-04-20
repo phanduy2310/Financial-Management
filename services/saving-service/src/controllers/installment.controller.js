@@ -38,7 +38,10 @@ exports.create = async (req, res) => {
 exports.payInstallment = async (req, res) => {
     try {
         const { id } = req.params;
-        const result = await payInstallment({ id });
+        const result = await payInstallment({
+            id,
+            authToken: req.headers.authorization,
+        });
 
         res.json({
             message: result.message,

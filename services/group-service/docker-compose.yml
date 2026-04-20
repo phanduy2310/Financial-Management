@@ -2,7 +2,7 @@ services:
   group-service:
     build: .
     ports:
-      - "5002:5002"
+      - "8085:8085"
     env_file:
       - .env.dev
     volumes:

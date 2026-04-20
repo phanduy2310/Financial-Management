@@ -2,13 +2,13 @@ services:
   transaction-service:
     build: .
     ports:
-      - "5001:5001"
+      - "8082:8082"
     environment:
       MYSQL_HOST: mysql
       MYSQL_USER: finance_user
       MYSQL_PASSWORD: finance_pass
       MYSQL_DATABASE: financial_transaction
-      PORT: 5001
+      PORT: 8082
     volumes:
       - .:/app
       - /app/node_modules

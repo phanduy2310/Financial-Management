@@ -25,7 +25,10 @@ exports.addInstallment = async (req, res) => {
             params: req.params,
             body: req.body,
         });
-        const result = await addSavingInstallment(input);
+        const result = await addSavingInstallment({
+            ...input,
+            authToken: req.headers.authorization,
+        });
 
         res.status(201).json({
             message: "Đã thêm khoản trả góp",
