@@ -1,4 +1,3 @@
-require('dotenv').config({ path: '.env.dev' });
 
 module.exports = {
   client: 'mysql2',
