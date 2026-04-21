@@ -23,7 +23,7 @@
 | **Frontend** | React SPA — giao diện người dùng, gọi API qua Gateway | React 19, TailwindCSS, Recharts | 5000 | 3000 (nginx) |
 | **Gateway** | Routing, CORS, proxy đến các service | Node.js, Express, axios | 5444 | 5444 |
 | **auth-service** | Đăng ký, đăng nhập, JWT, liên kết phụ huynh | Node.js, Express, Objection.js, bcrypt | — | 8081 |
-| **transaction-service** | Ghi nhận thu chi, ngân sách | Node.js, Express, Objection.js | — | 8082 |
+| **transaction-service** | Ghi nhận thu chi | Node.js, Express, Objection.js | — | 8082 |
 | **saving-service** | Kế hoạch tiết kiệm, trả góp | Node.js, Express, Objection.js | — | 8083 |
 | **notification-service** | Thông báo real-time qua SSE | Node.js, Express | — | 8084 |
 | **group-service** | Nhóm chi tiêu, chia bill | Node.js, Express, Objection.js | — | 8085 |

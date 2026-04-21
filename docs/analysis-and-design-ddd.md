@@ -5,7 +5,7 @@
 ### 1.1 Business Process Definition
 
 - **Domain**: Quản lý tài chính cá nhân
-- **Business Process**: "Người dùng theo dõi thu chi, đặt kế hoạch tiết kiệm, quản lý trả góp và chia sẻ chi tiêu nhóm"
+- **Business Process**: "Người dùng theo dõi thu chi, tạo kế hoạch tiết kiệm, quản lý trả góp và chia sẻ chi tiêu nhóm"
 - **Actors**: Người dùng (User), Phụ huynh (Parent — chế độ giám sát)
 - **Scope**: Từ khi người dùng đăng ký tài khoản đến khi thực hiện giao dịch, đặt kế hoạch tiết kiệm, trả góp, nhóm chi tiêu và nhận thông báo — không bao gồm tích hợp ngân hàng thực hay xử lý thanh toán thực.
 
@@ -14,19 +14,17 @@
 ```mermaid
 flowchart TD
     A([Đăng ký / Đăng nhập]) --> B[Ghi giao dịch thu/chi]
-    B --> C[Đặt ngân sách theo danh mục]
-    B --> D[Tạo kế hoạch tiết kiệm]
-    B --> E[Quản lý trả góp]
-    B --> F[Tạo nhóm chi tiêu]
-    D --> G{Đạt mục tiêu?}
-    G -->|Có| H[Kế hoạch hoàn thành]
-    E --> I[Thanh toán từng kỳ]
-    F --> J[Thêm thành viên]
-    J --> K[Chia bill — ghi giao dịch nhóm]
-    H --> L([Nhận thông báo real-time])
-    I --> L
-    K --> L
-    C --> L
+    B --> C[Tạo kế hoạch tiết kiệm]
+    B --> D[Quản lý trả góp]
+    B --> E[Tạo nhóm chi tiêu]
+    C --> F{Đạt mục tiêu?}
+    F -->|Có| G[Kế hoạch hoàn thành]
+    D --> H[Thanh toán từng kỳ]
+    E --> I[Thêm thành viên]
+    I --> J[Chia bill — ghi giao dịch nhóm]
+    G --> K([Nhận thông báo real-time])
+    H --> K
+    J --> K
 ```
 
 ### 1.2 Existing Automation Systems
@@ -62,7 +60,6 @@ flowchart TD
 | **Group Transaction** | Giao dịch thuộc nhóm, có thể chia cho các thành viên | Chi tiêu "Du lịch" 1.000.000đ chia đều 3 người |
 | **Share** | Phần chi tiêu của từng thành viên trong một Group Transaction | Mỗi người chịu 333.333đ |
 | **Notification** | Thông báo real-time gửi đến người dùng khi có sự kiện quan trọng | "Kế hoạch tiết kiệm iPhone 17 đã hoàn thành!" |
-| **Budget** | Ngân sách chi tiêu theo danh mục trong khoảng thời gian | Tháng 4: giới hạn 2.000.000đ cho "Ăn uống" |
 | **Progress** | Tỉ lệ phần trăm hoàn thành của một Saving Plan | 14.57% — đã tích lũy 5.100.000đ / 35.000.000đ |
 
 ### 2.2 Event Storming — Domain Events
@@ -75,19 +72,18 @@ flowchart TD
 | 4 | TransactionCreated | Một giao dịch thu hoặc chi được ghi nhận |
 | 5 | TransactionUpdated | Thông tin giao dịch được chỉnh sửa |
 | 6 | TransactionDeleted | Giao dịch bị xóa khỏi hệ thống |
-| 7 | BudgetSet | Người dùng đặt ngân sách cho một danh mục |
-| 8 | SavingPlanCreated | Kế hoạch tiết kiệm mới được tạo |
-| 9 | SavingProgressUpdated | Tiến độ tích lũy của kế hoạch được cập nhật |
-| 10 | SavingPlanCompleted | Kế hoạch tiết kiệm đạt 100% mục tiêu |
-| 11 | InstallmentCreated | Kế hoạch trả góp mới được tạo |
-| 12 | InstallmentPeriodPaid | Một kỳ trả góp được thanh toán |
-| 13 | InstallmentDueSoon | Kỳ trả góp sắp đến hạn (cảnh báo) |
-| 14 | GroupCreated | Nhóm chi tiêu mới được tạo |
-| 15 | MemberAdded | Thành viên mới tham gia nhóm |
-| 16 | MemberRemoved | Thành viên rời khỏi nhóm |
-| 17 | GroupTransactionCreated | Giao dịch nhóm được ghi nhận và chia tiền |
-| 18 | NotificationPublished | Thông báo được gửi đến người dùng qua SSE |
-| 19 | ParentLinked | Phụ huynh liên kết để theo dõi chi tiêu con |
+| 7 | SavingPlanCreated | Kế hoạch tiết kiệm mới được tạo |
+| 8 | SavingProgressUpdated | Tiến độ tích lũy của kế hoạch được cập nhật |
+| 9 | SavingPlanCompleted | Kế hoạch tiết kiệm đạt 100% mục tiêu |
+| 10 | InstallmentCreated | Kế hoạch trả góp mới được tạo |
+| 11 | InstallmentPeriodPaid | Một kỳ trả góp được thanh toán |
+| 12 | InstallmentDueSoon | Kỳ trả góp sắp đến hạn (cảnh báo) |
+| 13 | GroupCreated | Nhóm chi tiêu mới được tạo |
+| 14 | MemberAdded | Thành viên mới tham gia nhóm |
+| 15 | MemberRemoved | Thành viên rời khỏi nhóm |
+| 16 | GroupTransactionCreated | Giao dịch nhóm được ghi nhận và chia tiền |
+| 17 | NotificationPublished | Thông báo được gửi đến người dùng qua SSE |
+| 18 | ParentLinked | Phụ huynh liên kết để theo dõi chi tiêu con |
 
 ### 2.3 Commands and Actors
 
@@ -99,7 +95,6 @@ flowchart TD
 | CreateTransaction | User | TransactionCreated, NotificationPublished | Ghi nhận thu/chi với danh mục, số tiền, ngày |
 | UpdateTransaction | User | TransactionUpdated | Chỉnh sửa thông tin giao dịch |
 | DeleteTransaction | User | TransactionDeleted | Xóa giao dịch |
-| SetBudget | User | BudgetSet | Đặt giới hạn ngân sách theo danh mục |
 | CreateSavingPlan | User | SavingPlanCreated | Tạo kế hoạch tiết kiệm mới |
 | UpdateSavingProgress | User | SavingProgressUpdated, SavingPlanCompleted, NotificationPublished | Cập nhật số tiền đã tích lũy |
 | CreateInstallment | User | InstallmentCreated | Tạo kế hoạch trả góp |
@@ -116,7 +111,6 @@ flowchart TD
 |-----------|------------|----------|---------------|--------------------|
 | **User** | User | RegisterUser, LoginUser, RefreshToken, LinkParent | UserRegistered, UserLoggedIn, TokenRefreshed, ParentLinked | Email phải duy nhất; mật khẩu >= 6 ký tự |
 | **Transaction** | Transaction | CreateTransaction, UpdateTransaction, DeleteTransaction | TransactionCreated, TransactionUpdated, TransactionDeleted | Amount > 0; type phải là "income" hoặc "expense" |
-| **Budget** | Budget | SetBudget | BudgetSet | Budget gắn với user_id + category + tháng/năm |
 | **SavingPlan** | SavingPlan | CreateSavingPlan, UpdateSavingProgress | SavingPlanCreated, SavingProgressUpdated, SavingPlanCompleted | current_amount không vượt target_amount; progress 0–100% |
 | **Installment** | Installment | CreateInstallment, PayInstallmentPeriod | InstallmentCreated, InstallmentPeriodPaid, InstallmentDueSoon | paid_amount <= total_amount; kỳ thanh toán tuần tự |
 | **Group** | Group | CreateGroup, AddGroupMember, RemoveGroupMember | GroupCreated, MemberAdded, MemberRemoved | Chỉ owner mới có quyền thêm/xóa thành viên |
@@ -128,7 +122,7 @@ flowchart TD
 | Bounded Context | Aggregates Included | Responsibility | Service Candidate |
 |-----------------|---------------------|----------------|-------------------|
 | **Identity** | User | Quản lý danh tính, xác thực, phân quyền, liên kết phụ huynh | auth-service |
-| **Finance** | Transaction, Budget | Ghi nhận thu chi cá nhân, quản lý ngân sách | transaction-service |
+| **Finance** | Transaction | Ghi nhận thu chi cá nhân | transaction-service |
 | **Wealth** | SavingPlan, Installment | Kế hoạch tiết kiệm và quản lý trả góp | saving-service |
 | **Collaboration** | Group, GroupTransaction | Nhóm chi tiêu chung, chia bill | group-service |
 | **Messaging** | Notification | Thông báo real-time qua SSE | notification-service |
@@ -251,10 +245,6 @@ Full OpenAPI specs:
 | /api/transactions/:id | DELETE | Xóa giao dịch | — | 200, 404 |
 | /api/transactions/stats | POST | Thống kê theo tháng | {user_id, month, year} | 200 |
 | /api/transactions/stats/summary/:userId | GET | Tổng quan thu/chi/số dư | — | 200 |
-| /api/budget | POST | Tạo ngân sách | {user_id, category, limit_amount} | 200, 400 |
-| /api/budget/:userId | GET | Lấy ngân sách của user | — | 200 |
-| /api/budget/:id | PATCH | Cập nhật ngân sách | — | 200, 404 |
-| /api/budget/:id | DELETE | Xóa ngân sách | — | 200 |
 
 **saving-service — Wealth Context:**
 
