@@ -21,12 +21,11 @@
 PTIT-Financial hỗ trợ người dùng quản lý tài chính cá nhân theo quy trình:
 
 1. **Đăng ký / Đăng nhập** — xác thực danh tính, liên kết phụ huynh giám sát
-2. **Ghi giao dịch** — theo dõi thu nhập và chi tiêu theo danh mục
-3. **Ngân sách** — đặt giới hạn chi tiêu theo danh mục mỗi tháng
-4. **Kế hoạch tiết kiệm** — đặt mục tiêu tích lũy với theo dõi tiến độ
-5. **Trả góp** — quản lý các khoản vay theo từng kỳ thanh toán
-6. **Nhóm chi tiêu** — chia sẻ hóa đơn với bạn bè / gia đình
-7. **Thông báo real-time** — nhận thông báo giao dịch, nhắc kế hoạch tiết kiệm, liên kết phụ huynh qua SSE
+2. **Ghi giao dịch** — theo dõi thu nhập và chi tiêu
+3. **Kế hoạch tiết kiệm** — đặt mục tiêu tích lũy với theo dõi tiến độ
+4. **Trả góp** — quản lý các khoản vay theo từng kỳ thanh toán
+5. **Nhóm chi tiêu** — chia sẻ hóa đơn với bạn bè / gia đình
+6. **Thông báo real-time** — nhận thông báo giao dịch, nhắc kế hoạch tiết kiệm, liên kết phụ huynh qua SSE
 
 ---
 
