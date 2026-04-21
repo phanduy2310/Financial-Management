@@ -6,8 +6,8 @@ RUN npm install
 COPY src/ .
 
 # Nhận API URL lúc build — Railway truyền qua Build Arguments
-ARG REACT_APP_API_BASE_URL=http://localhost:5444/api
-ARG REACT_APP_GATEWAY_URL=http://localhost:5444
+ARG REACT_APP_API_BASE_URL=https://gateway-api.up.railway.app/api
+ARG REACT_APP_GATEWAY_URL=https://gateway-api.up.railway.app
 ENV REACT_APP_API_BASE_URL=$REACT_APP_API_BASE_URL
 ENV REACT_APP_GATEWAY_URL=$REACT_APP_GATEWAY_URL
 
