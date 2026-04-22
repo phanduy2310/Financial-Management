@@ -37,5 +37,10 @@ app.use("/api/installment", savingProxy);
 app.use("/api/notification", notificationProxy);
 app.use("/api/groups", groupProxy);
 
+// 404 fallback
+app.use((req, res) => {
+  res.status(404).json({ error: `Route not found: ${req.method} ${req.originalUrl}` });
+});
+
 const PORT = process.env.PORT || 5444;
 app.listen(PORT, () => console.log(`🚀 API Gateway running on port ${PORT}`));

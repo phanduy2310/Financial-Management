@@ -13,4 +13,8 @@ app.use("/internal", internalRoutes);
 app.get("/health", (req, res) => res.json({ status: "ok" }));
 app.get("/", (req, res) => res.send("Notification Service is running 🚀"));
 
+app.use((req, res) => {
+    res.status(404).json({ error: `Route not found: ${req.method} ${req.originalUrl}` });
+});
+
 module.exports = app;

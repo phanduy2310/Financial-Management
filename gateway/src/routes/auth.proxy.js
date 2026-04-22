@@ -24,7 +24,7 @@ router.use(async (req, res) => {
     });
 
     if (response.headers["set-cookie"]) {
-      res.setHeader("set-cookie", response.headers["set-cookie"]);
+      res.setHeader("set-cookie", response.headers["set-cookie"] );
     }
 
     res.status(response.status).json(response.data);

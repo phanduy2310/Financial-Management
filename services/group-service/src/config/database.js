@@ -1,4 +1,3 @@
-require('dotenv').config({ path: require('path').join(__dirname, '../../.env.dev') });
 // Load .env.dev khi dev local, Railway tự inject env vars
 if (process.env.NODE_ENV !== 'production' && !process.env.RAILWAY_ENVIRONMENT) {
   require('dotenv').config({ path: require('path').join(__dirname, '../../.env.dev') });
