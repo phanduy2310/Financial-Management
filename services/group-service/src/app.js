@@ -17,4 +17,8 @@ app.use('/api/groups/:group_id/transactions', transactionRoutes);
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
+app.use((req, res) => {
+    res.status(404).json({ error: `Route not found: ${req.method} ${req.originalUrl}` });
+});
+
 module.exports = app;
