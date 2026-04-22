@@ -1,6 +1,8 @@
+// Load .env.dev khi dev local, Railway tự inject env vars
+if (process.env.NODE_ENV !== 'production' && !process.env.RAILWAY_ENVIRONMENT) {
+  require('dotenv').config({ path: '.env.dev' });
+}
 const path = require("path");
-require("dotenv").config({ path: ".env.dev" });
-console.log("Using DB:", process.env.MYSQL_DATABASE);
 
 module.exports = {
   client: 'mysql2',
