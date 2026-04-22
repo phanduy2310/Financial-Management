@@ -3,7 +3,7 @@
  * @returns { Promise<void> }
  */
 exports.up = async function (knex) {
-    await knex.schema.createTable("parent_child_links", (table) => {
+    await knex.schema.createTableIfNotExists("parent_child_links", (table) => {
         table.increments("id").primary();
         table.integer("parent_id").notNullable();
         table.integer("child_id").notNullable();
@@ -19,7 +19,7 @@ exports.up = async function (knex) {
         table.unique(["parent_id", "child_id"]);
     });
 
-    await knex.schema.createTable("parent_child_tokens", (table) => {
+    await knex.schema.createTableIfNotExists("parent_child_tokens", (table) => {
         table.increments("id").primary();
         table
             .integer("parent_child_id")

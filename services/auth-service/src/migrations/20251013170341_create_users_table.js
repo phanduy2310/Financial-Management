@@ -3,7 +3,7 @@
  * @returns { Promise<void> }
  */
 exports.up = async function (knex) {
-    await knex.schema.createTable("users", (table) => {
+    await knex.schema.createTableIfNotExists("users", (table) => {
         table.increments("id").primary();
         table.string("fullname").notNullable();
         table.string("email").unique().notNullable();
