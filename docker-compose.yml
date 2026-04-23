@@ -127,7 +127,7 @@ services:
     env_file:
       - ./gateway/.env
     ports:
-      - "${GATEWAY_PORT:-5444}:5444"
+      - "${GATEWAY_PORT:-8080}:8080"
     depends_on:
       auth-service:
         condition: service_healthy
@@ -140,7 +140,7 @@ services:
       group-service:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:5444/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
       interval: 10s
       timeout: 5s
       retries: 5

@@ -1,7 +1,7 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-COPY src/package*.json ./
+COPY package*.json ./
 RUN npm install --omit=dev
 COPY src/ .
 
@@ -9,6 +9,6 @@ FROM node:20-alpine
 WORKDIR /app
 
 COPY --from=builder /app /app
-EXPOSE 5444
+EXPOSE 8080
 
 CMD ["node", "server.js"]

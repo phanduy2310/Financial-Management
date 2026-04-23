@@ -1,4 +1,3 @@
-require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
@@ -42,5 +41,4 @@ app.use((req, res) => {
   res.status(404).json({ error: `Route not found: ${req.method} ${req.originalUrl}` });
 });
 
-const PORT = process.env.PORT || 5444;
-app.listen(PORT, () => console.log(`🚀 API Gateway running on port ${PORT}`));
+module.exports = app;

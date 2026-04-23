@@ -1,6 +1,5 @@
 const express = require("express");
 const morgan = require("morgan");
-const cors = require("cors");
 const cookieParser = require("cookie-parser");
 
 const authRoutes = require("./routes/auth.route");
@@ -8,14 +7,7 @@ const parentChildRoutes = require("./routes/parent_child.route");
 
 const app = express();
 
-const corsOptions = {
-    origin: process.env.FRONTEND_URL || "http://localhost:5000",
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-};
-
-app.use(cors(corsOptions));
+// Service chỉ nhận request từ gateway (internal network) — không cần CORS
 app.use(cookieParser());
 app.use(express.json());
 app.use(morgan("dev"));
