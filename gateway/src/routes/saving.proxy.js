@@ -1,32 +1,28 @@
 const express = require("express");
 const axios = require("axios");
-require("dotenv").config();
+const { error } = require("../utils/response");
 
 const router = express.Router();
 const SAVING_URL = process.env.SAVING_SERVICE_URL;
 
 router.use(async (req, res) => {
   try {
-    const targetUrl = `${SAVING_URL}${req.originalUrl}`;
+    const headers = { "Content-Type": "application/json" };
+    if (req.headers.authorization) headers["Authorization"] = req.headers.authorization;
+
     const response = await axios({
       method: req.method,
-      url: targetUrl,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: req.headers.authorization,
-        host: undefined,
-        connection: undefined,
-      },
+      url: `${SAVING_URL}${req.originalUrl}`,
       data: req.body,
+      headers,
+      validateStatus: () => true,
       timeout: 5000,
     });
 
     res.status(response.status).json(response.data);
   } catch (err) {
     console.error("[SAVING PROXY ERROR]", err.message);
-    res
-      .status(err.response?.status || 500)
-      .json(err.response?.data || { error: err.message });
+    error(res, err.message, 502, "PROXY_ERROR");
   }
 });
 

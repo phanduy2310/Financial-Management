@@ -1,12 +1,12 @@
 const express = require("express");
 const axios = require("axios");
 const http = require("http");
-require("dotenv").config();
+const { error } = require("../utils/response");
 
 const router = express.Router();
 const NOTIFICATION_URL = process.env.NOTIFICATION_SERVICE_URL;
 
-// SSE stream
+// SSE stream — dùng http thuần vì axios không support streaming
 router.get("/stream", (req, res) => {
   const targetUrl = new URL(`${NOTIFICATION_URL}${req.originalUrl}`);
 
@@ -16,7 +16,8 @@ router.get("/stream", (req, res) => {
     path: targetUrl.pathname + targetUrl.search,
     method: "GET",
     headers: {
-      ...req.headers,
+      Authorization: req.headers.authorization || "",
+      Accept: "text/event-stream",
       host: targetUrl.host,
     },
   };
@@ -27,7 +28,7 @@ router.get("/stream", (req, res) => {
   });
 
   proxyReq.on("error", (err) => {
-    console.error("[SSE proxy error]", err.message);
+    console.error("[SSE PROXY ERROR]", err.message);
     if (!res.headersSent) res.status(502).end();
   });
 
@@ -36,25 +37,25 @@ router.get("/stream", (req, res) => {
   proxyReq.end();
 });
 
-// Other route
+// Các route thông thường
 router.use(async (req, res) => {
   try {
+    const headers = { "Content-Type": "application/json" };
+    if (req.headers.authorization) headers["Authorization"] = req.headers.authorization;
+
     const response = await axios({
       method: req.method,
       url: `${NOTIFICATION_URL}${req.originalUrl}`,
       data: req.body,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: req.headers.authorization,
-        host: undefined,
-        connection: undefined,
-      },
+      headers,
+      validateStatus: () => true,
+      timeout: 5000,
     });
+
     res.status(response.status).json(response.data);
   } catch (err) {
-    res
-      .status(err.response?.status || 500)
-      .json(err.response?.data || { error: err.message });
+    console.error("[NOTIFICATION PROXY ERROR]", err.message);
+    error(res, err.message, 502, "PROXY_ERROR");
   }
 });
 
