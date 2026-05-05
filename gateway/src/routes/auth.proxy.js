@@ -1,21 +1,19 @@
 const express = require("express");
 const axios = require("axios");
+const { error } = require("../utils/response");
 
 const router = express.Router();
 const AUTH_URL = process.env.AUTH_SERVICE_URL;
 
 router.use(async (req, res) => {
   try {
-    const targetUrl = `${AUTH_URL}${req.originalUrl}`;
-    const headers = {
-      "Content-Type": "application/json",
-    };
+    const headers = { "Content-Type": "application/json" };
     if (req.headers.authorization) headers["Authorization"] = req.headers.authorization;
     if (req.headers.cookie) headers["Cookie"] = req.headers.cookie;
 
     const response = await axios({
       method: req.method,
-      url: targetUrl,
+      url: `${AUTH_URL}${req.originalUrl}`,
       headers,
       data: req.body,
       validateStatus: () => true,
@@ -23,15 +21,13 @@ router.use(async (req, res) => {
     });
 
     if (response.headers["set-cookie"]) {
-      res.setHeader("set-cookie", response.headers["set-cookie"] );
+      res.setHeader("set-cookie", response.headers["set-cookie"]);
     }
 
     res.status(response.status).json(response.data);
   } catch (err) {
     console.error("[AUTH PROXY ERROR]", err.message);
-    res
-      .status(err.response?.status || 500)
-      .json(err.response?.data || { error: err.message });
+    error(res, err.message, 502, "PROXY_ERROR");
   }
 });
 

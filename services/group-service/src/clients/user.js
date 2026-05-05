@@ -10,7 +10,7 @@ exports.getListFullNameByUserIds = async (user_ids) => {
         }
 
         const response = await axios.post(
-            `${BASE_URL}/api/auth/users/bulk`,
+            `${BASE_URL}/api/user/infor`,
             {
                 ids: user_ids
             },

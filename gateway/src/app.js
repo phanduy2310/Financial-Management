@@ -28,7 +28,10 @@ app.get("/health", (req, res) => {
 
 // Proxy routes
 app.use("/api/auth", authProxy);
+app.use("/api/user", authProxy);
 app.use("/api/parent", authProxy);
+app.use("/api/admin", authProxy);
+
 app.use("/api/transactions", transactionProxy);
 app.use("/api/budget", transactionProxy);
 app.use("/api/saving", savingProxy);

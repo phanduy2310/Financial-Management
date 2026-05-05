@@ -18,7 +18,7 @@ export default function ManageMemberModal({
             setLoading(true);
 
             // 1. Tìm user theo email qua auth service
-            const res = await axios.get(`/auth/users/find`, {
+            const res = await axios.get(`/user/find`, {
                 params: { email },
             });
 

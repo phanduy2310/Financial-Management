@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 const { verifyAccessToken } = require("../utils/jwt");
 const User = require("../models/user.model");
-
+const {findById} = require("../services/user.service")
 function hasMatchingInternalKey(providedKey, expectedKey) {
     if (typeof providedKey !== "string" || typeof expectedKey !== "string") {
         return false;
@@ -28,7 +28,7 @@ exports.authenticate = async (req, res, next) => {
         }
 
         const decoded = verifyAccessToken(token);
-        const user = await User.query().findById(decoded.id);
+        const user = await findById(decoded.id);
         if (!user) {
             return res.status(401).json({ message: "User khong ton tai" });
         }

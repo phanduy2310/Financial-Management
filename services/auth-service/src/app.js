@@ -3,7 +3,9 @@ const morgan = require("morgan");
 const cookieParser = require("cookie-parser");
 
 const authRoutes = require("./routes/auth.route");
+const userRoutes = require("./routes/user.route")
 const parentChildRoutes = require("./routes/parent_child.route");
+const adminRoutes = require("./routes/admin.route")
 
 const app = express();
 
@@ -13,6 +15,8 @@ app.use(express.json());
 app.use(morgan("dev"));
 
 app.use("/api/auth", authRoutes);
+app.use("/api/user", userRoutes);
+app.use("/api/admin", adminRoutes);
 app.use("/api/parent", parentChildRoutes);
 
 app.get("/health", (req, res) => res.json({ status: "ok" }));

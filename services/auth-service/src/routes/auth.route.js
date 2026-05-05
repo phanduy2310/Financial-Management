@@ -12,18 +12,4 @@ router.post("/login", auth.login);
 router.post("/refresh", auth.refreshToken);
 router.post("/logout", auth.logout);
 
-// /users/find dùng JWT — client gọi để tìm user theo email khi add member vào nhóm
-router.get("/users/find", authenticate, auth.findByEmail);
-
-// Các route /users còn lại chỉ dành cho internal service calls
-router.use("/users", requireInternalKey);
-router.post("/users/bulk", auth.getUsersBulk);
-router.get("/users/:id", auth.getUserById);
-
-router.get("/me", authenticate, auth.me);
-
-router.get("/admin-only", authenticate, authorize("admin"), (req, res) => {
-    res.json({ message: `Xin chào admin ${req.user.fullname}` });
-});
-
 module.exports = router;
