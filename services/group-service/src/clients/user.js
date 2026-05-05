@@ -21,7 +21,7 @@ exports.getListFullNameByUserIds = async (user_ids) => {
             }
         );
 
-        const users = response.data?.users || [];
+        const users = response.data?.data?.users || [];
 
         return users.map((user) => ({
             id: user.id,
