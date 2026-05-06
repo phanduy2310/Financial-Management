@@ -98,11 +98,11 @@ export default function Header({ collapsed, setCollapsed }) {
                     </div>
                     <div className="hidden lg:block">
                         <h1 className="text-lg font-black text-gray-900 leading-none tracking-tighter uppercase">
-                            PTIT <span className="text-[#CE1126]">Finance</span>
+                            <span className="text-[#CE1126]">Quản lý tài chính</span>
                         </h1>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
+                        {/* <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
                             Quản lý tài chính 
-                        </p>
+                        </p> */}
                     </div>
                 </div>
 

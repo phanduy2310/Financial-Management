@@ -71,22 +71,32 @@ export default function Sidebar({ collapsed }) {
             href: "",
             icon: <LayoutDashboard size={20} />,
         },
+        // {
+        //     name: "Giao dịch",
+        //     key: "Transactions",
+        //     icon: <BadgeDollarSign size={20} />,
+        //     children: [
+        //         {
+        //             name: "Thu nhập",
+        //             href: "transactions/income",
+        //             icon: <BanknoteArrowUp size={18} />,
+        //         },
+        //         {
+        //             name: "Chi tiêu",
+        //             href: "transactions/expense",
+        //             icon: <BanknoteArrowDown size={18} />,
+        //         },
+        //     ],
+        // },
         {
-            name: "Giao dịch",
-            key: "Transactions",
-            icon: <BadgeDollarSign size={20} />,
-            children: [
-                {
-                    name: "Thu nhập",
-                    href: "transactions/income",
-                    icon: <BanknoteArrowUp size={18} />,
-                },
-                {
-                    name: "Chi tiêu",
-                    href: "transactions/expense",
-                    icon: <BanknoteArrowDown size={18} />,
-                },
-            ],
+            name: "Thu nhập",
+            href: "transactions/income",
+            icon: <BanknoteArrowUp size={18} />,
+        },
+        {
+            name: "Chi tiêu",
+            href: "transactions/expense",
+            icon: <BanknoteArrowDown size={18} />,
         },
         {
             name: "Kế hoạch tiết kiệm",
@@ -150,9 +160,8 @@ export default function Sidebar({ collapsed }) {
                     {/* Nhóm header */}
                     <div
                         onClick={() => toggleMenu(item.key || item.name)}
-                        className={`${linkBase} cursor-pointer ${hoverStyle} ${
-                            isOpen ? "bg-white/10" : ""
-                        }`}
+                        className={`${linkBase} cursor-pointer ${hoverStyle} ${isOpen ? "bg-white/10" : ""
+                            }`}
                     >
                         <span className="group-hover:scale-110 transition-transform duration-200">
                             {item.icon}
@@ -161,9 +170,8 @@ export default function Sidebar({ collapsed }) {
                             <span className="flex-1">{item.name}</span>
                         )}
                         {!collapsed && (
-                            <span className={`transition-transform duration-200 ${
-                                isOpen ? "rotate-180" : ""
-                            }`}>
+                            <span className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""
+                                }`}>
                                 <ChevronDown size={16} />
                             </span>
                         )}
@@ -178,8 +186,7 @@ export default function Sidebar({ collapsed }) {
                                     to={child.href}
                                     end
                                     className={({ isActive }) =>
-                                        `${linkBase} ${hoverStyle} ${
-                                            isActive ? activeStyle : "text-white/80"
+                                        `${linkBase} ${hoverStyle} ${isActive ? activeStyle : "text-white/80"
                                         }`
                                     }
                                 >
@@ -201,8 +208,7 @@ export default function Sidebar({ collapsed }) {
                 to={item.href}
                 end
                 className={({ isActive }) =>
-                    `${linkBase} ${hoverStyle} ${
-                        isActive ? activeStyle : "text-white/90"
+                    `${linkBase} ${hoverStyle} ${isActive ? activeStyle : "text-white/90"
                     }`
                 }
             >
@@ -216,9 +222,8 @@ export default function Sidebar({ collapsed }) {
 
     return (
         <aside
-            className={`bg-gradient-to-b from-primary-700 to-primary-800 text-white flex flex-col justify-between transition-all duration-300 shadow-large ${
-                collapsed ? "w-20" : "w-64"
-            }`}
+            className={`bg-gradient-to-b from-primary-700 to-primary-800 text-white flex flex-col justify-between transition-all duration-300 shadow-large ${collapsed ? "w-20" : "w-64"
+                }`}
         >
             {/* 👤 USER INFO */}
             <div>
@@ -258,7 +263,7 @@ export default function Sidebar({ collapsed }) {
             {/* ⚙️ FOOTER */}
             {!collapsed && (
                 <div className="flex items-center justify-between border-t border-white/10 p-4 text-xs opacity-80">
-                    <span className="text-white/70">© 2026 PTIT</span>
+                    <span className="text-white/70">© 2026</span>
                     <button
                         className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/10 transition-all duration-200 text-white/90 hover:text-white"
                         onClick={handleLogout}
